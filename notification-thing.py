@@ -80,7 +80,7 @@ from gi.repository import Gtk, Gdk, GdkPixbuf, Pango
 import itertools as it, operator as op, functools as ft
 from dbus.mainloop.glib import DBusGMainLoop
 from fgc.fc import FC_TokenBucket, RRQ
-import dbus, dbus.service, gobject, cgi, glib, urllib
+import dbus, dbus.service, gobject, glib, urllib
 import os, sys
 
 from collections import deque, OrderedDict
@@ -111,15 +111,9 @@ class Notification(dict):
 		'Get all arguments in dbus-interface order.'
 		return cls(**dict(it.izip(cls.dbus_args, argz)))
 
-	@staticmethod
-	def _escape_tags(text, encoding='utf-8'):
-		if not isinstance(text, unicode): text = text.decode(encoding, 'replace')
-		return cgi.escape(text).encode('ascii', 'xmlcharrefreplace')
-
 	def __init__( self, summary='', body='', timeout=-1, icon='',
 			app_name='generic', replaces_id=dbus.UInt32(), actions=dbus.Array(signature='s'),
 			hints=dict(urgency=dbus.Byte(urgency_levels.critical, variant_level=1)) ):
-		summary, body = self._escape_tags(summary), self._escape_tags(body)
 		if timeout == -1: timeout = optz.default_timeout # yes, -1 is special-case value in specs
 		argz = self.__init__.func_code.co_varnames # a bit hacky, but DRY
 		super(Notification, self).__init__(
@@ -228,16 +222,7 @@ class NotificationDisplay(object):
 		widget_body = Gtk.TextView( name='body',
 			wrap_mode=Gtk.WrapMode.WORD_CHAR )
 		widget_body_buffer = widget_body.get_buffer()
-		try:
-			# Parameters: markup_text, length, accel_marker
-			# Return: (success, attr_list, text, accel_char)
-			parse_result = Pango.parse_markup(body, -1, u"\x00")
-			widget_body_buffer.set_text(parse_result[2])
-			# TODO: TextTag wankery, should notes become html-like
-			# widget_body_buffer.set_attributes(parse_result[1])
-		except glib.GError:
-			log.exception('Invalid pango markup in message: {!r}.'.format(body))
-			widget_body_buffer.set_text(body)
+		widget_body_buffer.set_text(body)
 		v_box.pack_start(widget_body, False, False, 0)
 
 		win.show_all()
@@ -321,7 +306,7 @@ class NotificationDaemon(dbus.service.Object):
 	def GetCapabilities(self):
 		# action-icons, actions, body, body-hyperlinks, body-images,
 		#  body-markup, icon-multi, icon-static, persistence, sound
-		return ['body', 'body-markup', 'persistence', 'icon-static']
+		return ['body', 'persistence', 'icon-static']
 
 	@_dbus_signal('uu')
 	def NotificationClosed(self, nid, reason):
