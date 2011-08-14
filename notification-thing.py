@@ -323,8 +323,6 @@ class NotificationDisplay(object):
 
 
 
-
-
 class NotificationDaemon(dbus.service.Object):
 	plugged, timeout_cleanup = False, True
 
@@ -342,7 +340,6 @@ class NotificationDaemon(dbus.service.Object):
 
 	_dbus_method = ft.partial(dbus.service.method, dbus_id)
 	_dbus_signal = ft.partial(dbus.service.signal, dbus_id)
-
 
 	@_dbus_method('', 'ssss')
 	def GetServerInformation(self):
