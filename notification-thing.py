@@ -161,11 +161,14 @@ class NotificationDisplay(object):
 					base[ax] + (margin + win.get_size()[ax])\
 						* (2 * (2**ax ^ (2**ax & self.layout_anchor)) / 2**ax - 1), xrange(2) ))
 
-	def _create_win(self, summary, body, icon=None):
+	def _create_win(self, summary, body, icon=None, urgency_label=None):
+		log.debug( 'Creating window with parameters: {}'\
+			.format(', '.join(map(unicode, [summary, body, icon, urgency_label]))) )
+
 		win = Gtk.Window(name='notification', type=Gtk.WindowType.POPUP)
 		win.set_default_size(400, 20)
 
-		frame = Gtk.Frame()
+		frame = Gtk.Frame(shadow_type=Gtk.ShadowType.ETCHED_OUT)
 		win.add(frame)
 
 		widget_icon = None
@@ -215,7 +218,11 @@ class NotificationDisplay(object):
 
 		widget_summary = Gtk.Label(name='summary', label=summary)
 		widget_summary.set_alignment(0, 0)
-		v_box.pack_start(widget_summary, False, False, 0)
+		if urgency_label:
+			summary_box = Gtk.EventBox(name=urgency_label or '')
+			summary_box.add(widget_summary)
+		else: summary_box = widget_summary
+		v_box.pack_start(summary_box, False, False, 0)
 
 		v_box.pack_start(Gtk.HSeparator(name='hs'), False, False, 0)
 
@@ -251,7 +258,9 @@ class NotificationDisplay(object):
 				image = hints.get(k)
 				if image: break
 
-			win = self._create_win(note.summary, note.body, image)
+			urgency = note.hints.get('urgency')
+			if urgency is not None: urgency = urgency_levels.by_id(int(urgency))
+			win = self._create_win(note.summary, note.body, image, urgency)
 			if cb_dismiss:
 				win.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
 				win.connect('button-press-event', cb_dismiss, nid)
