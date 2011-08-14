@@ -256,7 +256,7 @@ class NotificationDisplay(object):
 		widget_summary = Gtk.Label(name='summary', label=summary)
 		widget_summary.set_alignment(0, 0)
 		if urgency_label:
-			summary_box = Gtk.EventBox(name=urgency_label or '')
+			summary_box = Gtk.EventBox(name=urgency_label)
 			summary_box.add(widget_summary)
 		else: summary_box = widget_summary
 		v_box.pack_start(summary_box, False, False, 0)
