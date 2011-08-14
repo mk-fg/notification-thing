@@ -3,6 +3,8 @@
 from __future__ import unicode_literals, print_function
 
 
+import argparse
+
 class Enum(dict):
 	def __init__(self, *keys, **kwz):
 		if not keys: super(Enum, self).__init__(**kwz)
@@ -17,6 +19,13 @@ class Enum(dict):
 		for k,v in self.viewitems():
 			if v == v_chk: return k
 		else: raise KeyError(v_chk)
+
+def EnumAction(enum):
+	class EnumAction(argparse.Action):
+		def __call__(self, parser, namespace, values, option_string=None):
+			setattr(namespace, self.dest, self.enum[values])
+	EnumAction.enum = enum
+	return EnumAction
 
 
 ####
@@ -37,7 +46,6 @@ layout_direction = Enum('horizontal', 'vertical')
 ####
 
 
-import argparse
 parser = argparse.ArgumentParser(description='Desktop notification server.')
 
 parser.add_argument('-f', '--no-fs-check',
@@ -56,6 +64,15 @@ parser.add_argument('-t', '--default-timeout', type=int, default=int(optz['defau
 	help='Default timeout for notification popups removal (default: %(default)sms)')
 parser.add_argument('-q', '--queue-len', type=int, default=optz['queue_len'],
 	help='How many messages should be queued on tbf overflow  (default: %(default)s)')
+
+parser.add_argument('--layout-anchor', choices=layout_anchor,
+	action=EnumAction(layout_anchor), default=layout_anchor.top_left,
+	help='Screen corner notifications gravitate to (default: top_left).')
+parser.add_argument('--layout-direction', choices=layout_direction,
+	action=EnumAction(layout_direction), default=layout_direction.vertical,
+	help='Direction for notification stack growth from --layout-anchor corner (default: vertical).')
+parser.add_argument('--layout-margin', default=3,
+	help='Margin between notifications, screen edges, and some misc stuff (default: %(default)spx).')
 
 parser.add_argument('--tbf-size', type=int, default=optz['tbf_size'],
 	help='Token-bucket message-flow filter (tbf) bucket size (default: %(default)s)')
@@ -135,11 +152,12 @@ class NotificationDisplay(object):
 			methods and NoWindowError(nid) exception, raised on erroneous nid's in close().
 		Current implementation based on notipy: git://github.com/the-isz/notipy.git'''
 
-	def __init__(self, margin=3):
+	def __init__(self):
 		self.margins = dict(it.chain.from_iterable(map(
-			lambda ax: ((2**ax, margin), (-2**ax, margin)), xrange(2) )))
-		self.layout_anchor = layout_anchor.top_left
-		self.layout_direction = layout_direction.vertical
+			lambda ax: ( (2**ax, optz.layout_margin),
+				(-2**ax, optz.layout_margin) ), xrange(2) )))
+		self.layout_anchor = optz.layout_anchor
+		self.layout_direction = optz.layout_direction
 
 		self._nid_pool = it.chain.from_iterable(
 			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
@@ -164,7 +182,7 @@ class NotificationDisplay(object):
 			Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION )
 
 	def _update_layout(self):
-		# Yep, I was SMOKING CRACK here, and it all made sense
+		# Yep, I was SMOKING CRACK here, and it all made sense at the time
 		base = tuple(map(
 			lambda ax, gdk_dim=('width', 'height'):\
 				(getattr(Gdk.Screen, gdk_dim[ax])() - self.margins[2**ax])\
@@ -226,9 +244,9 @@ class NotificationDisplay(object):
 				widget_icon = Gtk.Image()
 				widget_icon.set_from_pixbuf(pixbuf)
 
-		v_box = Gtk.VBox(spacing=3, expand=False)
+		v_box = Gtk.VBox(spacing=optz.layout_margin, expand=False)
 		if widget_icon is not None:
-			h_box = Gtk.HBox(spacing=5)
+			h_box = Gtk.HBox(spacing=optz.layout_margin * 2)
 			frame.add(h_box)
 			h_box.pack_start(widget_icon, False, False, 0)
 			h_box.pack_start(v_box, True, True, 0)
