@@ -118,6 +118,7 @@ DBusGMainLoop(set_as_default=True)
 bus = dbus.SessionBus()
 
 
+
 class Notification(dict):
 	__slots__ = tuple()
 	dbus_args = 'app_name', 'replaces_id', 'icon',\
@@ -161,7 +162,7 @@ class NotificationDisplay(object):
 
 		self._nid_pool = it.chain.from_iterable(
 			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
-		self._windows = dict()
+		self._windows = OrderedDict()
 
 		self._default_style = Gtk.CssProvider()
 		self._default_style.load_from_data( b'''
