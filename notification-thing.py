@@ -136,14 +136,32 @@ class NotificationDisplay(object):
 		Current implementation based on notipy: git://github.com/the-isz/notipy.git'''
 
 	def __init__(self, margin=3):
-		self._nid_pool = it.chain.from_iterable(
-			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
-		self._windows = dict()
 		self.margins = dict(it.chain.from_iterable(map(
 			lambda ax: ((2**ax, margin), (-2**ax, margin)), xrange(2) )))
 		self.layout_anchor = layout_anchor.top_left
 		self.layout_direction = layout_direction.vertical
 
+		self._nid_pool = it.chain.from_iterable(
+			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
+		self._windows = dict()
+
+		self._default_style = Gtk.CssProvider()
+		self._default_style.load_from_data( b'''
+			#notification { background-color: white; }
+			#notification #hs { background-color: black; }
+
+			#notification #critical { background-color: #ffaeae; }
+			#notification #normal { background-color: #f0ffec; }
+			#notification #low { background-color: #bee3c6; }
+
+			#notification #summary {
+				font-size: 10;
+				text-shadow: 1 1 0 gray;
+			}
+			#notification #body { font-size: 8; }''' )
+		Gtk.StyleContext.add_provider_for_screen(
+			Gdk.Screen.get_default(), self._default_style,
+			Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION )
 
 	def _update_layout(self):
 		# Yep, I was SMOKING CRACK here, and it all made sense
