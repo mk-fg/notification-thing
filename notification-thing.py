@@ -100,7 +100,7 @@ from fgc.fc import FC_TokenBucket, RRQ
 import dbus, dbus.service, gobject, glib, urllib
 import os, sys
 
-from collections import deque, OrderedDict
+from collections import deque, OrderedDict, namedtuple
 from time import time
 
 from fgc.scheme import load, init_env
@@ -152,6 +152,7 @@ class NotificationDisplay(object):
 		Should have "display(note, cb_dismiss=None) -> nid(UInt32, >0)", "close(nid)"
 			methods and NoWindowError(nid) exception, raised on erroneous nid's in close().
 		Current implementation based on notipy: git://github.com/the-isz/notipy.git'''
+	window = namedtuple('Window', 'gobj event_boxes')
 
 	def __init__(self):
 		self.margins = dict(it.chain.from_iterable(map(
@@ -160,8 +161,6 @@ class NotificationDisplay(object):
 		self.layout_anchor = optz.layout_anchor
 		self.layout_direction = optz.layout_direction
 
-		self._nid_pool = it.chain.from_iterable(
-			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
 		self._windows = OrderedDict()
 
 		self._default_style = Gtk.CssProvider()
@@ -188,7 +187,7 @@ class NotificationDisplay(object):
 			lambda ax, gdk_dim=('width', 'height'):\
 				(getattr(Gdk.Screen, gdk_dim[ax])() - self.margins[2**ax])\
 					if 2**ax & self.layout_anchor else self.margins[-2**ax], xrange(2) ))
-		for win in self._windows.viewvalues():
+		for win in map(op.attrgetter('gobj'), self._windows.viewvalues()):
 			win.move(*map(lambda ax: base[ax] - ( win.get_size()[ax]
 				if 2**ax & self.layout_anchor else 0 ), xrange(2)))
 			margin = self.margins[(2 * ( (2**self.layout_direction)
@@ -204,6 +203,7 @@ class NotificationDisplay(object):
 
 		win = Gtk.Window(name='notification', type=Gtk.WindowType.POPUP)
 		win.set_default_size(400, 20)
+		ev_boxes = [win]
 
 		frame = Gtk.Frame(shadow_type=Gtk.ShadowType.ETCHED_OUT)
 		win.add(frame)
@@ -268,18 +268,13 @@ class NotificationDisplay(object):
 		widget_body_buffer = widget_body.get_buffer()
 		widget_body_buffer.set_text(body)
 		v_box.pack_start(widget_body, False, False, 0)
+		ev_boxes.append(widget_body)
 
 		win.show_all()
-		return win
+		return self.window(win, ev_boxes)
 
 
-	def display(self, note, cb_dismiss=None): # TODO: cb_mouseover
-		if not note.replaces_id: nid = next(self._nid_pool)
-		else:
-			nid = note.replaces_id
-			try: self._close(nid)
-			except self.NoWindowError: pass
-
+	def display(self, note, cb_dismiss=None, cb_hover=None, cb_leave=None):
 		try:
 			# Priorities for icon sources:
 			#  image-data: hint. raw image data structure of signature (iiibiiay)
@@ -298,22 +293,27 @@ class NotificationDisplay(object):
 			urgency = note.hints.get('urgency')
 			if urgency is not None: urgency = urgency_levels.by_id(int(urgency))
 			win = self._create_win(note.summary, note.body, image, urgency)
-			if cb_dismiss:
-				win.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
-				win.connect('button-press-event', cb_dismiss, nid)
+			for eb in win.event_boxes:
+				eb.add_events(
+					Gdk.EventMask.BUTTON_PRESS_MASK
+					| Gdk.EventMask.POINTER_MOTION_MASK
+					| Gdk.EventMask.LEAVE_NOTIFY_MASK )
+				for ev,cb in [
+						('button-press-event', cb_dismiss),
+						('motion-notify-event', cb_hover),
+						('leave-notify-event', cb_leave) ]:
+					if cb: eb.connect(ev, lambda w,ev,cb,nid: cb(nid), cb, note.id)
 
-			self._windows[nid] = win
+			self._windows[note.id] = win
 			self._update_layout()
 
 		except: log.exception('Failed to create notification window')
-
-		return nid
 
 
 	class NoWindowError(Exception): pass
 
 	def _close(self, nid):
-		try: win = self._windows.pop(nid)
+		try: win = self._windows.pop(nid).gobj
 		except KeyError: raise self.NoWindowError(nid)
 		win.hide(), win.destroy()
 
@@ -334,9 +334,10 @@ class NotificationDaemon(dbus.service.Object):
 			tick_strangle=lambda x: min(x*optz.tbf_inc, tick_strangle_max),
 			tick_free=lambda x: max(op.truediv(x, optz.tbf_dec), 1) )
 		self._note_buffer = RRQ(optz.queue_len)
-		self._note_windows = OrderedDict()
+		self._note_windows = dict()
+		self._note_id_pool = it.chain.from_iterable(
+			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
 		self._renderer = NotificationDisplay()
-
 
 	_dbus_method = ft.partial(dbus.service.method, dbus_id)
 	_dbus_signal = ft.partial(dbus.service.signal, dbus_id)
@@ -551,27 +552,54 @@ class NotificationDaemon(dbus.service.Object):
 	def display(self, note_or_summary, *argz, **kwz):
 		note = note_or_summary if isinstance(note_or_summary, Notification)\
 			else Notification(note_or_summary, *argz, **kwz)
+
 		if note.replaces_id in self._note_windows:
-			gobject.source_remove(self._note_windows[note.replaces_id])
-		nid = self._renderer.display( note,
+			self.close(note.replaces_id, close_reasons.closed)
+			note.id = self._note_windows[note.replaces_id]
+		else: note.id = next(self._note_id_pool)
+		nid = note.id
+
+		self._renderer.display( note,
+			cb_hover=ft.partial(self.close, delay=True),
+			cb_leave=ft.partial(self.close, delay=False),
 			cb_dismiss=ft.partial(self.close, reason=close_reasons.dismissed) )
-		self._note_windows[nid] = gobject.timeout_add_seconds(
-				int(note.timeout / 1000), self.close, nid, close_reasons.expired )\
-			if self.timeout_cleanup and note.timeout > 0 else None
+
+		if self.timeout_cleanup and note.timeout > 0:
+			self._note_windows[nid] = note
+			timeout = int(note.timeout / 1000) # TODO: find better timer
+			note.timer_created, note.timer_left = time(), timeout
+			note.timer_id = gobject.timeout_add_seconds(
+				timeout, self.close, nid, close_reasons.expired )
+
 		log.debug( 'Created notification (id: {}, timeout: {}ms)'\
-			.format(nid, self._note_windows[nid] and note.timeout) )
+			.format(nid, self.timeout_cleanup and note.timeout) )
 		return nid
 
-	def close(self, nid=None, reason=close_reasons.undefined):
+	def close(self, nid=None, reason=close_reasons.undefined, delay=None):
 		if nid:
-			log.debug(
-				'Closing notification(s) (id: {}, reason: {})'\
-				.format(nid, close_reasons.by_id(reason)) )
-			timer = self._note_windows.pop(nid, None)
-			if timer: gobject.source_remove(timer)
-			try: self._renderer.close(nid)
-			except self._renderer.NoWindowError: pass # no such window
-			else: self.NotificationClosed(nid, reason)
+			note = self._note_windows.get(nid, None)
+			if note and 'timer_id' in note:
+				if note.timer_id: gobject.source_remove(note.timer_id)
+
+				if delay is None: del self._note_windows[nid]
+				else: # these get sent very often
+					if delay:
+						if note.timer_id:
+							note.timer_id, note.timer_left = None, note.timer_left - (time() - note.timer_created)
+					else:
+						note.timer_created = time()
+						note.timer_id = gobject.timeout_add_seconds(
+							max(int(note.timer_left), 1), self.close, nid, close_reasons.expired )
+					return
+
+			if delay is None: # try it, even if there's no note object
+				log.debug(
+					'Closing notification(s) (id: {}, reason: {})'\
+					.format(nid, close_reasons.by_id(reason)) )
+				try: self._renderer.close(nid)
+				except self._renderer.NoWindowError: pass # no such window
+				else: self.NotificationClosed(nid, reason)
+
 		else: # close all of them
 			for nid in self._note_windows.keys(): self.close(nid, reason)
 
