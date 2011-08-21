@@ -345,13 +345,14 @@ class NotificationDaemon(dbus.service.Object):
 		self._activity_event()
 
 
-	def exit(self):
-		log.debug('Exiting cleanly')
+	def exit(self, reason=None):
+		log.debug('Exiting cleanly{}'.format(', reason: {}'.format(reason) if reason else ''))
 		sys.exit()
 
 	def _activity_event(self):
 		if self._activity_timer: gobject.source_remove(self._activity_timer)
-		self._activity_timer = gobject.timeout_add_seconds(optz.activity_timeout, self.exit)
+		self._activity_timer = gobject.timeout_add_seconds(
+			optz.activity_timeout, self.exit, 'activity timeout ({}s)'.format(optz.activity_timeout) )
 
 	_dbus_method = ft.partial(dbus.service.method, dbus_id)
 	_dbus_signal = ft.partial(dbus.service.signal, dbus_id)
