@@ -30,7 +30,7 @@ def EnumAction(enum):
 
 ####
 
-optz=dict( default_timeout=5, queue_len=10,
+optz=dict( activity_timeout=5*60, popup_timeout=5, queue_len=10,
 	tbf_size=4, tbf_tick=15, tbf_max_delay=60, tbf_inc=2, tbf_dec=2 )
 poll_interval = 60
 
@@ -54,13 +54,16 @@ parser.add_argument('-f', '--no-fs-check',
 parser.add_argument('-u', '--no-urgency-check',
 	action='store_false', dest='urgency_check', default=True,
 	help='Queue messages even if urgency is critical')
+parser.add_argument('-c', '--activity-timeout', type=int, default=int(optz['activity_timeout']),
+	help='No-activity (dbus calls) timeout before closing the daemon instance'
+		' (less or equal zero - infinite, default: %(default)ss)')
 parser.add_argument('--no-status-notify',
 	action='store_false', dest='status_notify', default=True,
 	help='Do not send notification on changes in proxy settings.')
 parser.add_argument('--filter-file', default='~/.notification_filter',
 	help='Read simple scheme rules for filtering notifications from file (default: %(default)s).')
 
-parser.add_argument('-t', '--default-timeout', type=int, default=int(optz['default_timeout']*1000),
+parser.add_argument('-t', '--popup-timeout', type=int, default=int(optz['popup_timeout']*1000),
 	help='Default timeout for notification popups removal (default: %(default)sms)')
 parser.add_argument('-q', '--queue-len', type=int, default=optz['queue_len'],
 	help='How many messages should be queued on tbf overflow  (default: %(default)s)')
@@ -132,7 +135,7 @@ class Notification(dict):
 	def __init__( self, summary='', body='', timeout=-1, icon='',
 			app_name='generic', replaces_id=dbus.UInt32(), actions=dbus.Array(signature='s'),
 			hints=dict(urgency=dbus.Byte(urgency_levels.critical, variant_level=1)) ):
-		if timeout == -1: timeout = optz.default_timeout # yes, -1 is special-case value in specs
+		if timeout == -1: timeout = optz.popup_timeout # yes, -1 is special-case value in specs
 		argz = self.__init__.func_code.co_varnames # a bit hacky, but DRY
 		super(Notification, self).__init__(
 			it.izip(argz, op.itemgetter(*argz)(locals())) )
@@ -325,6 +328,7 @@ class NotificationDisplay(object):
 
 class NotificationDaemon(dbus.service.Object):
 	plugged, timeout_cleanup = False, True
+	_activity_timer = None
 
 	def __init__(self, *argz, **kwz):
 		tick_strangle_max = op.truediv(optz.tbf_max_delay, optz.tbf_tick)
@@ -338,18 +342,31 @@ class NotificationDaemon(dbus.service.Object):
 		self._note_id_pool = it.chain.from_iterable(
 			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
 		self._renderer = NotificationDisplay()
+		self._activity_event()
+
+
+	def exit(self):
+		log.debug('Exiting cleanly')
+		sys.exit()
+
+	def _activity_event(self):
+		if self._activity_timer: gobject.source_remove(self._activity_timer)
+		self._activity_timer = gobject.timeout_add_seconds(optz.activity_timeout, self.exit)
 
 	_dbus_method = ft.partial(dbus.service.method, dbus_id)
 	_dbus_signal = ft.partial(dbus.service.signal, dbus_id)
 
+
 	@_dbus_method('', 'ssss')
 	def GetServerInformation(self):
+		self._activity_event()
 		return 'Notifications', 'freedesktop.org', '0.1', '0.7.1'
 
 	@_dbus_method('', 'as')
 	def GetCapabilities(self):
 		# action-icons, actions, body, body-hyperlinks, body-images,
 		#  body-markup, icon-multi, icon-static, persistence, sound
+		self._activity_event()
 		return ['body', 'persistence', 'icon-static']
 
 	@_dbus_signal('uu')
@@ -366,10 +383,12 @@ class NotificationDaemon(dbus.service.Object):
 	@_dbus_method('', '')
 	def Flush(self):
 		log.debug('Manual flush of the notification buffer')
+		self._activity_event()
 		return self.flush(force=True)
 
 	@_dbus_method('a{sb}', '')
 	def Set(self, params):
+		self._activity_event()
 		# Urgent-passthrough controls
 		if params.pop('urgent_toggle', None): params['urgent'] = not optz.urgency_check
 		try: val = params.pop('urgent')
@@ -416,6 +435,7 @@ class NotificationDaemon(dbus.service.Object):
 
 	@_dbus_method('susssasa{sv}i', 'u')
 	def Notify(self, app_name, nid, icon, summary, body, actions, hints, timeout):
+		self._activity_event()
 		note = Notification.from_dbus(
 			app_name, nid, icon, summary, body, actions, hints, timeout )
 		try: return self.filter(note)
@@ -426,6 +446,7 @@ class NotificationDaemon(dbus.service.Object):
 	@_dbus_method('u', '')
 	def CloseNotification(self, nid):
 		log.debug('CloseNotification call (id: {})'.format(nid))
+		self._activity_event()
 		self.close(nid, reason=close_reasons.closed)
 
 
