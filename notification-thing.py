@@ -215,6 +215,7 @@ class NotificationDisplay(object):
 		if icon is not None:
 			if isinstance(icon, unicode):
 				icon_path = os.path.expanduser(urllib.url2pathname(icon))
+				if icon_path.startswith('file://'): icon_path = icon_path[7:]
 				if os.path.isfile(icon_path):
 					widget_icon = Gtk.Image()
 					widget_icon.set_from_file(icon_path)
@@ -280,18 +281,20 @@ class NotificationDisplay(object):
 	def display(self, note, cb_dismiss=None, cb_hover=None, cb_leave=None):
 		try:
 			# Priorities for icon sources:
-			#  image-data: hint. raw image data structure of signature (iiibiiay)
-			#  image-path: hint. either an URI (file://...) or a name in a f.o-compliant icon theme
+			#  image{-,_}data: hint. raw image data structure of signature (iiibiiay)
+			#  image{-,_}path: hint. either an URI (file://...) or a name in a f.o-compliant icon theme
 			#  app_icon: parameter. same as image-path
 			#  icon_data: hint. same as image-data
+			# image_* is a workaround for some broken apps and libs which don't use libnotify
 			hints = note.hints.copy()
-			for k in xrange(2**30):
-				if k in hints: continue
-				hints[k] = note.icon
-				break
-			for k in 'image-data', 'image-path', k, 'icon_data':
+			k = '__app_icon' # to avoid clobbering anything
+			hints[k] = note.icon
+			for k in 'image-data', 'image_data',\
+					'image-path', 'image_path', k, 'icon_data':
 				image = hints.get(k)
-				if image: break
+				if image:
+					log.debug('Got icon image from hint: {}'.format(k))
+					break
 
 			urgency = note.hints.get('urgency')
 			if urgency is not None: urgency = urgency_levels.by_id(int(urgency))
