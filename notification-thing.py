@@ -285,7 +285,8 @@ class NotificationDisplay(object):
 			#  image{-,_}path: hint. either an URI (file://...) or a name in a f.o-compliant icon theme
 			#  app_icon: parameter. same as image-path
 			#  icon_data: hint. same as image-data
-			# image_* is a workaround for some broken apps and libs which don't use libnotify
+			# image_* is a deprecated hints from 1.1 spec, 1.2 is preferred
+			#  (don't seem to be even mentioned in 1.2 spec icon priorities section)
 			hints = note.hints.copy()
 			k = '__app_icon' # to avoid clobbering anything
 			hints[k] = note.icon
