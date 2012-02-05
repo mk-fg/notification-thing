@@ -22,11 +22,11 @@ yet another...
 Actual notification rendering is inspired (and based in part on)
 [notipy](https://github.com/the-isz/notipy) project.
 
-I wrote a few expanded notes on the subject over time
+I wrote a few extended notes on the subject over time
 ([link1](http://blog.fraggod.net/2010/2/libnotify-notification-daemon-shortcomings-and-my-solution),
 [link2](http://blog.fraggod.net/2010/12/Further-improvements-on-notification-daemon),
-[link3](http://blog.fraggod.net/2011/8/Notification-daemon-in-python)),
-but it's mostly summarized above.
+[link3](http://blog.fraggod.net/2011/8/Notification-daemon-in-python)), but it's
+mostly summarized above.
 
 
 Requirements
@@ -42,14 +42,14 @@ Requirements
   [fgc.scheme](https://github.com/mk-fg/fgc/blob/master/fgc/scheme.py) for
   filtering, etc).
 
-Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here,
-it's usually used to send the messages, not receive and display them.
+Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here
+- it's usually used to send the messages, not receive and display them.
 
 
 Installation / Usage
 --------------------
 
-Just make sure nothing else is already listening on the same dbus path and start
+Just make sure nothing else is already listening on the same dbus path/interface and start
 the script by hand or install it as a dbus service file to be started whenever
 notifications arrive (and exiting during silence timeouts).
 
@@ -159,12 +159,19 @@ decisions are made and based on what data.
 DBus interface lacks proper introspection at the moment, but is extended with a
 few functions, more info on which can be found
 [here](http://blog.fraggod.net/2010/12/Further-improvements-on-notification-daemon)
-and [here](http://blog.fraggod.net/2011/8/Notification-daemon-in-python).
+and [here](http://blog.fraggod.net/2011/8/Notification-daemon-in-python). For
+example, to temporarily block/unblock all but the urgent notifications:
 
-Appearance (and some behavior) of the popup windows is subject to [gtk3 styles
-(via simple css
-files)](http://developer.gnome.org/gtk3/3.1/GtkCssProvider.html), with default
-being the light one (see the actual code for up-to-date stylesheet though):
+    dbus-send --type=method_call\
+      --dest=org.freedesktop.Notifications
+      /org/freedesktop/Notifications\
+      org.freedesktop.Notifications.Set\
+      dict:string:boolean:plug_toggle,true
+
+Appearance (and some behavior) of the popup windows is subject to [gtk3
+styles](http://developer.gnome.org/gtk3/3.1/GtkCssProvider.html) (simple css
+files), with default being the light one (see the actual code for up-to-date
+stylesheet though):
 
     #notification { background-color: white; }
     #notification #hs { background-color: black; }
