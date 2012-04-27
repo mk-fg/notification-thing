@@ -42,8 +42,8 @@ Requirements
   [fgc.scheme](https://github.com/mk-fg/fgc/blob/master/fgc/scheme.py) for
   filtering, etc).
 
-Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here
-- it's usually used to send the messages, not receive and display them.
+Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here -
+it's usually used to send the messages, not receive and display them.
 
 
 Installation / Usage
