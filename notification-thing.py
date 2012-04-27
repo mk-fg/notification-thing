@@ -30,7 +30,7 @@ def EnumAction(enum):
 
 ####
 
-optz=dict( activity_timeout=5*60, popup_timeout=5, queue_len=10,
+optz=dict( activity_timeout=10*60, popup_timeout=5, queue_len=10,
 	tbf_size=4, tbf_tick=15, tbf_max_delay=60, tbf_inc=2, tbf_dec=2 )
 poll_interval = 60
 
@@ -357,10 +357,17 @@ class NotificationDaemon(dbus.service.Object):
 		log.debug('Exiting cleanly{}'.format(', reason: {}'.format(reason) if reason else ''))
 		sys.exit()
 
-	def _activity_event(self):
+	def _activity_event(self, callback=False):
+		if callback:
+			if not self._note_windows:
+				self.exit(reason='activity timeout ({}s)'.format(optz.activity_timeout))
+			else:
+				log.debug( 'Ignoring inacivity timeout event'
+					' due to existing windows (retry in {}s).'.format(optz.activity_timeout) )
+				self._activity_timer = None
 		if self._activity_timer: gobject.source_remove(self._activity_timer)
 		self._activity_timer = gobject.timeout_add_seconds(
-			optz.activity_timeout, self.exit, 'activity timeout ({}s)'.format(optz.activity_timeout) )
+			optz.activity_timeout, self._activity_event, True )
 
 	_dbus_method = ft.partial(dbus.service.method, dbus_id)
 	_dbus_signal = ft.partial(dbus.service.signal, dbus_id)
