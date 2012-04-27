@@ -310,6 +310,10 @@ class NotificationDisplay(object):
 						('motion-notify-event', cb_hover),
 						('leave-notify-event', cb_leave) ]:
 					if cb: eb.connect(ev, lambda w,ev,cb,nid: cb(nid), cb, note.id)
+			if cb_dismiss and win.event_boxes:
+				# Connect only to window object (or first eventbox in the list)
+				win.event_boxes[0].connect( 'destroy',
+					lambda w,cb,nid: cb(nid), cb_dismiss, note.id )
 
 			self._windows[note.id] = win
 			self._update_layout()
@@ -521,7 +525,7 @@ class NotificationDaemon(dbus.service.Object):
 			to = self._note_limit.get_eta() if not plug else poll_interval
 			if to > 1: # no need to bother otherwise, note that it'll be an extra token ;)
 				self._note_buffer.append(note)
-				to = int(to) + 1 # +1 is to ensure token arrival by that time
+				to = to + 1 # +1 is to ensure token arrival by that time
 				log.debug( 'Queueing notification. Reason: {}. Flush attempt in {}s'\
 					.format('plug or fullscreen window detected' if plug else 'notification rate limit', to) )
 				self.flush(timeout=to)
@@ -545,7 +549,7 @@ class NotificationDaemon(dbus.service.Object):
 			self._flush_timer = None
 		if timeout:
 			log.debug('Scheduled notification buffer flush in {}s'.format(timeout))
-			self._flush_timer = gobject.timeout_add_seconds(timeout, self.flush)
+			self._flush_timer = gobject.timeout_add(int(timeout * 1000), self.flush)
 			return
 		if not self._note_buffer:
 			log.debug('Flush event with empty notification buffer')
@@ -589,15 +593,14 @@ class NotificationDaemon(dbus.service.Object):
 			cb_hover=ft.partial(self.close, delay=True),
 			cb_leave=ft.partial(self.close, delay=False),
 			cb_dismiss=ft.partial(self.close, reason=close_reasons.dismissed) )
+		self._note_windows[nid] = note
 
 		if self.timeout_cleanup and note.timeout > 0:
-			self._note_windows[nid] = note
-			timeout = int(note.timeout / 1000) # TODO: find better timer
-			note.timer_created, note.timer_left = time(), timeout
-			note.timer_id = gobject.timeout_add_seconds(
-				timeout, self.close, nid, close_reasons.expired )
+			note.timer_created, note.timer_left = time(), note.timeout
+			note.timer_id = gobject.timeout_add(
+				note.timeout, self.close, nid, close_reasons.expired )
 
-		log.debug( 'Created notification (id: {}, timeout: {}ms)'\
+		log.debug( 'Created notification (id: {}, timeout: {} (ms))'\
 			.format(nid, self.timeout_cleanup and note.timeout) )
 		return nid
 
@@ -611,12 +614,15 @@ class NotificationDaemon(dbus.service.Object):
 				else: # these get sent very often
 					if delay:
 						if note.timer_id:
-							note.timer_id, note.timer_left = None, note.timer_left - (time() - note.timer_created)
+							note.timer_id, note.timer_left = None,\
+								note.timer_left - (time() - note.timer_created)
 					else:
 						note.timer_created = time()
-						note.timer_id = gobject.timeout_add_seconds(
-							max(int(note.timer_left), 1), self.close, nid, close_reasons.expired )
+						note.timer_id = gobject.timeout_add(
+							int(max(note.timer_left, 1) * 1000),
+							self.close, nid, close_reasons.expired )
 					return
+			elif note: del self._note_windows[nid]
 
 			if delay is None: # try it, even if there's no note object
 				log.debug(
