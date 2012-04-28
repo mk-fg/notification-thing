@@ -603,7 +603,7 @@ class NotificationDaemon(dbus.service.Object):
 		self._note_windows[nid] = note
 
 		if self.timeout_cleanup and note.timeout > 0:
-			note.timer_created, note.timer_left = time(), note.timeout
+			note.timer_created, note.timer_left = time(), note.timeout / 1000.0
 			note.timer_id = gobject.timeout_add(
 				note.timeout, self.close, nid, close_reasons.expired )
 
@@ -614,11 +614,11 @@ class NotificationDaemon(dbus.service.Object):
 	def close(self, nid=None, reason=close_reasons.undefined, delay=None):
 		if nid:
 			note = self._note_windows.get(nid, None)
-			if note and 'timer_id' in note:
-				if note.timer_id: gobject.source_remove(note.timer_id)
+			if note:
+				if getattr(note, 'timer_id', None): gobject.source_remove(note.timer_id)
 
 				if delay is None: del self._note_windows[nid]
-				else: # these get sent very often
+				elif 'timer_id' in note: # these get sent very often
 					if delay:
 						if note.timer_id:
 							note.timer_id, note.timer_left = None,\
@@ -629,7 +629,6 @@ class NotificationDaemon(dbus.service.Object):
 							int(max(note.timer_left, 1) * 1000),
 							self.close, nid, close_reasons.expired )
 					return
-			elif note: del self._note_windows[nid]
 
 			if delay is None: # try it, even if there's no note object
 				log.debug(
