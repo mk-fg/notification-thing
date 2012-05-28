@@ -2,336 +2,25 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
-
-import argparse
-
-class Enum(dict):
-	def __init__(self, *keys, **kwz):
-		if not keys: super(Enum, self).__init__(**kwz)
-		else:
-			vals = kwz.pop('vals', range(len(keys)))
-			if kwz: raise TypeError(kwz)
-			super(Enum, self).__init__(zip(keys, vals))
-	def __getattr__(self, k):
-		if not k.startswith('__'): return self[k]
-		else: raise AttributeError
-	def by_id(self, v_chk):
-		for k,v in self.viewitems():
-			if v == v_chk: return k
-		else: raise KeyError(v_chk)
-
-def EnumAction(enum):
-	class EnumAction(argparse.Action):
-		def __call__(self, parser, namespace, values, option_string=None):
-			setattr(namespace, self.dest, self.enum[values])
-	EnumAction.enum = enum
-	return EnumAction
-
-
-####
-
-optz=dict( activity_timeout=10*60, popup_timeout=5, queue_len=10,
-	tbf_size=4, tbf_tick=15, tbf_max_delay=60, tbf_inc=2, tbf_dec=2 )
-poll_interval = 60
-
-dbus_id = 'org.freedesktop.Notifications'
-dbus_path = '/org/freedesktop/Notifications'
-
-urgency_levels = Enum('low', 'normal', 'critical')
-close_reasons = Enum('expired', 'dismissed', 'closed', 'undefined', vals=range(1, 5))
-
-layout_anchor = Enum('top_left', 'top_right', 'bottom_left', 'bottom_right')
-layout_direction = Enum('horizontal', 'vertical')
-
-####
-
-
-parser = argparse.ArgumentParser(description='Desktop notification server.')
-
-parser.add_argument('-f', '--no-fs-check',
-	action='store_false', dest='fs_check', default=True,
-	help='Dont queue messages if active window is fullscreen')
-parser.add_argument('-u', '--no-urgency-check',
-	action='store_false', dest='urgency_check', default=True,
-	help='Queue messages even if urgency is critical')
-parser.add_argument('-c', '--activity-timeout', type=int, default=int(optz['activity_timeout']),
-	help='No-activity (dbus calls) timeout before closing the daemon instance'
-		' (less or equal zero - infinite, default: %(default)ss)')
-parser.add_argument('--no-status-notify',
-	action='store_false', dest='status_notify', default=True,
-	help='Do not send notification on changes in proxy settings.')
-parser.add_argument('--filter-file', default='~/.notification_filter',
-	help='Read simple scheme rules for filtering notifications from file (default: %(default)s).')
-
-parser.add_argument('-t', '--popup-timeout', type=int, default=int(optz['popup_timeout']*1000),
-	help='Default timeout for notification popups removal (default: %(default)sms)')
-parser.add_argument('-q', '--queue-len', type=int, default=optz['queue_len'],
-	help='How many messages should be queued on tbf overflow  (default: %(default)s)')
-
-parser.add_argument('--layout-anchor', choices=layout_anchor,
-	action=EnumAction(layout_anchor), default=layout_anchor.top_left,
-	help='Screen corner notifications gravitate to (default: top_left).')
-parser.add_argument('--layout-direction', choices=layout_direction,
-	action=EnumAction(layout_direction), default=layout_direction.vertical,
-	help='Direction for notification stack growth from --layout-anchor corner (default: vertical).')
-parser.add_argument('--layout-margin', default=3,
-	help='Margin between notifications, screen edges, and some misc stuff (default: %(default)spx).')
-
-parser.add_argument('--tbf-size', type=int, default=optz['tbf_size'],
-	help='Token-bucket message-flow filter (tbf) bucket size (default: %(default)s)')
-parser.add_argument('--tbf-tick', type=int, default=optz['tbf_tick'],
-	help='tbf update interval (new token), so token_inflow = token / tbf_tick (default: %(default)ss)')
-parser.add_argument('--tbf-max-delay', type=int, default=optz['tbf_max_delay'],
-	help='Maxmum amount of seconds, between message queue flush (default: %(default)ss)')
-parser.add_argument('--tbf-inc', type=int, default=optz['tbf_inc'],
-	help='tbf_tick multiplier on consequent tbf overflow (default: %(default)s)')
-parser.add_argument('--tbf-dec', type=int, default=optz['tbf_dec'],
-	help='tbf_tick divider on successful grab from non-empty bucket,'
-		' wont lower multiplier below 1 (default: %(default)s)')
-
-parser.add_argument('--debug', action='store_true', help='Enable debug logging to stderr.')
-optz = parser.parse_args()
-
+import itertools as it, operator as op, functools as ft
+from time import time
+from dbus.mainloop.glib import DBusGMainLoop
+import dbus, dbus.service
+import os, sys, re
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, GdkPixbuf, Pango
+from gi.repository import GObject, Gdk
 
-import itertools as it, operator as op, functools as ft
-from dbus.mainloop.glib import DBusGMainLoop
-from fgc.fc import FC_TokenBucket, RRQ
-import dbus, dbus.service, gobject, glib, urllib
-import os, sys
+from notification_thing import core
+from notification_thing.display import NotificationDisplay
 
-from collections import deque, OrderedDict, namedtuple
-from time import time
-
-from fgc.scheme import load, init_env
-from fgc.err import ext_traceback
-import re
-
-
-import logging
-logging.basicConfig(level=logging.DEBUG if optz.debug else logging.WARNING)
-log = logging.getLogger()
-
-optz.filter_file = os.path.expanduser(optz.filter_file)
 
 DBusGMainLoop(set_as_default=True)
 bus = dbus.SessionBus()
 
-
-
-class Notification(dict):
-	__slots__ = tuple()
-	dbus_args = 'app_name', 'replaces_id', 'icon',\
-		'summary', 'body', 'actions', 'hints', 'timeout'
-
-	@classmethod
-	def from_dbus(cls, *argz):
-		'Get all arguments in dbus-interface order.'
-		return cls(**dict(it.izip(cls.dbus_args, argz)))
-
-	def __init__( self, summary='', body='', timeout=-1, icon='',
-			app_name='generic', replaces_id=dbus.UInt32(), actions=dbus.Array(signature='s'),
-			hints=dict(urgency=dbus.Byte(urgency_levels.critical, variant_level=1)) ):
-		if timeout == -1: timeout = optz.popup_timeout # yes, -1 is special-case value in specs
-		argz = self.__init__.func_code.co_varnames # a bit hacky, but DRY
-		super(Notification, self).__init__(
-			it.izip(argz, op.itemgetter(*argz)(locals())) )
-
-	def __iter__(self):
-		return iter(op.itemgetter(*self.dbus_args)(self))
-
-	def __getattr__(self, k):
-		if not k.startswith('__'): return self[k]
-		else: raise AttributeError
-	def __setattr__(self, k, v): self[k] = v
-
-
-
-class NotificationDisplay(object):
-	'''Interface to display notification stack.
-		Should have "display(note, cb_dismiss=None) -> nid(UInt32, >0)", "close(nid)"
-			methods and NoWindowError(nid) exception, raised on erroneous nid's in close().
-		Current implementation based on notipy: git://github.com/the-isz/notipy.git'''
-	window = namedtuple('Window', 'gobj event_boxes')
-
-	def __init__(self):
-		self.margins = dict(it.chain.from_iterable(map(
-			lambda ax: ( (2**ax, optz.layout_margin),
-				(-2**ax, optz.layout_margin) ), xrange(2) )))
-		self.layout_anchor = optz.layout_anchor
-		self.layout_direction = optz.layout_direction
-
-		self._windows = OrderedDict()
-
-		self._default_style = Gtk.CssProvider()
-		self._default_style.load_from_data( b'''
-			#notification { background-color: white; }
-			#notification #hs { background-color: black; }
-
-			#notification #critical { background-color: #ffaeae; }
-			#notification #normal { background-color: #f0ffec; }
-			#notification #low { background-color: #bee3c6; }
-
-			#notification #summary {
-				font-size: 10;
-				text-shadow: 1 1 0 gray;
-			}
-			#notification #body { font-size: 8; }''' )
-		Gtk.StyleContext.add_provider_for_screen(
-			Gdk.Screen.get_default(), self._default_style,
-			Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION )
-
-	def _update_layout(self):
-		# Yep, I was SMOKING CRACK here, and it all made sense at the time
-		base = tuple(map(
-			lambda ax, gdk_dim=('width', 'height'):\
-				(getattr(Gdk.Screen, gdk_dim[ax])() - self.margins[2**ax])\
-					if 2**ax & self.layout_anchor else self.margins[-2**ax], xrange(2) ))
-		for win in map(op.attrgetter('gobj'), self._windows.viewvalues()):
-			win.move(*map(lambda ax: base[ax] - ( win.get_size()[ax]
-				if 2**ax & self.layout_anchor else 0 ), xrange(2)))
-			margin = self.margins[(2 * ( (2**self.layout_direction)
-				& self.layout_anchor ) / 2**self.layout_direction - 1) * 2**self.layout_direction]
-			base = tuple(map(
-				lambda ax: base[ax] if self.layout_direction != ax else\
-					base[ax] + (margin + win.get_size()[ax])\
-						* (2 * (2**ax ^ (2**ax & self.layout_anchor)) / 2**ax - 1), xrange(2) ))
-
-	def _create_win(self, summary, body, icon=None, urgency_label=None):
-		log.debug( 'Creating window with parameters: {}'\
-			.format(', '.join(map(unicode, [summary, body, icon, urgency_label]))) )
-
-		win = Gtk.Window(name='notification', type=Gtk.WindowType.POPUP)
-		win.set_default_size(400, 20)
-		ev_boxes = [win]
-
-		frame = Gtk.Frame(shadow_type=Gtk.ShadowType.ETCHED_OUT)
-		win.add(frame)
-
-		widget_icon = None
-		if icon is not None:
-			if isinstance(icon, unicode):
-				icon_path = os.path.expanduser(urllib.url2pathname(icon))
-				if icon_path.startswith('file://'): icon_path = icon_path[7:]
-				if os.path.isfile(icon_path):
-					widget_icon = Gtk.Image()
-					widget_icon.set_from_file(icon_path)
-				else:
-					# available names: Gtk.IconTheme.get_default().list_icons(None)
-					theme = Gtk.IconTheme.get_default()
-					if theme.has_icon(icon):
-						widget_icon = Gtk.Image()
-						widget_icon.set_from_icon_name(icon, Gtk.IconSize.DND) # XXX: why this IconSize?
-					else:
-						log.warn(( '"{}" seems to be neither a valid icon file nor'
-							' a name in a freedesktop.org-compliant icon theme (or your theme'
-							' doesnt have that name). Ignoring.' ).format(icon))
-			else:
-				# For image-data and icon_data, image should look like this:
-				# dbus.Struct(
-				#  (dbus.Int32, # width
-				#   dbus.Int32, # height
-				#   dbus.Int32, # rowstride
-				#   dbus.Boolean, # has alpha
-				#   dbus.Int32, # bits per sample
-				#   dbus.Int32, # channels
-				#   dbus.Array([dbus.Byte, ...])) # image data
-				# )
-				# data, colorspace, has_alpha, bits_per_sample,
-				#  width, height, rowstride, destroy_fn, destroy_fn_data
-				# XXX: Do I need to free the image via a function callback?
-				pixbuf = GdkPixbuf.Pixbuf.new_from_data(
-					bytearray(icon[6]), GdkPixbuf.Colorspace.RGB, icon[3], icon[4],
-					icon[0], icon[1], icon[2], lambda x, y: None, None )
-				widget_icon = Gtk.Image()
-				widget_icon.set_from_pixbuf(pixbuf)
-
-		v_box = Gtk.VBox(spacing=optz.layout_margin, expand=False)
-		if widget_icon is not None:
-			h_box = Gtk.HBox(spacing=optz.layout_margin * 2)
-			frame.add(h_box)
-			h_box.pack_start(widget_icon, False, False, 0)
-			h_box.pack_start(v_box, True, True, 0)
-		else: frame.add(v_box)
-
-		widget_summary = Gtk.Label(name='summary', label=summary)
-		widget_summary.set_alignment(0, 0)
-		if urgency_label:
-			summary_box = Gtk.EventBox(name=urgency_label)
-			summary_box.add(widget_summary)
-		else: summary_box = widget_summary
-		v_box.pack_start(summary_box, False, False, 0)
-
-		v_box.pack_start(Gtk.HSeparator(name='hs'), False, False, 0)
-
-		widget_body = Gtk.TextView( name='body',
-			wrap_mode=Gtk.WrapMode.WORD_CHAR )
-		widget_body_buffer = widget_body.get_buffer()
-		widget_body_buffer.set_text(body)
-		v_box.pack_start(widget_body, False, False, 0)
-		ev_boxes.append(widget_body)
-
-		win.show_all()
-		return self.window(win, ev_boxes)
-
-
-	def display(self, note, cb_dismiss=None, cb_hover=None, cb_leave=None):
-		try:
-			# Priorities for icon sources:
-			#  image{-,_}data: hint. raw image data structure of signature (iiibiiay)
-			#  image{-,_}path: hint. either an URI (file://...) or a name in a f.o-compliant icon theme
-			#  app_icon: parameter. same as image-path
-			#  icon_data: hint. same as image-data
-			# image_* is a deprecated hints from 1.1 spec, 1.2 is preferred
-			#  (don't seem to be even mentioned in 1.2 spec icon priorities section)
-			hints = note.hints.copy()
-			k = '__app_icon' # to avoid clobbering anything
-			hints[k] = note.icon
-			for k in 'image-data', 'image_data',\
-					'image-path', 'image_path', k, 'icon_data':
-				image = hints.get(k)
-				if image:
-					log.debug('Got icon image from hint: {}'.format(k))
-					break
-
-			urgency = note.hints.get('urgency')
-			if urgency is not None: urgency = urgency_levels.by_id(int(urgency))
-			win = self._create_win(note.summary, note.body, image, urgency)
-			for eb in win.event_boxes:
-				eb.add_events(
-					Gdk.EventMask.BUTTON_PRESS_MASK
-					| Gdk.EventMask.POINTER_MOTION_MASK
-					| Gdk.EventMask.LEAVE_NOTIFY_MASK )
-				for ev,cb in [
-						('button-press-event', cb_dismiss),
-						('motion-notify-event', cb_hover),
-						('leave-notify-event', cb_leave) ]:
-					if cb: eb.connect(ev, lambda w,ev,cb,nid: cb(nid), cb, note.id)
-			if cb_dismiss and win.event_boxes:
-				# Connect only to window object (or first eventbox in the list)
-				win.event_boxes[0].connect( 'destroy',
-					lambda w,cb,nid: cb(nid), cb_dismiss, note.id )
-
-			self._windows[note.id] = win
-			self._update_layout()
-
-		except: log.exception('Failed to create notification window')
-
-
-	class NoWindowError(Exception): pass
-
-	def _close(self, nid):
-		try: win = self._windows.pop(nid).gobj
-		except KeyError: raise self.NoWindowError(nid)
-		win.hide(), win.destroy()
-
-	def close(self, nid):
-		self._close(nid)
-		self._update_layout()
-
+optz, poll_interval, close_reasons, urgency_levels =\
+	core.optz, core.poll_interval, core.close_reasons, core.urgency_levels
 
 
 class NotificationDaemon(dbus.service.Object):
@@ -341,15 +30,16 @@ class NotificationDaemon(dbus.service.Object):
 	def __init__(self, *argz, **kwz):
 		tick_strangle_max = op.truediv(optz.tbf_max_delay, optz.tbf_tick)
 		super(NotificationDaemon, self).__init__(*argz, **kwz)
-		self._note_limit = FC_TokenBucket(
+		self._note_limit = core.FC_TokenBucket(
 			tick=optz.tbf_tick, burst=optz.tbf_size,
 			tick_strangle=lambda x: min(x*optz.tbf_inc, tick_strangle_max),
 			tick_free=lambda x: max(op.truediv(x, optz.tbf_dec), 1) )
-		self._note_buffer = RRQ(optz.queue_len)
+		self._note_buffer = core.RRQ(optz.queue_len)
 		self._note_windows = dict()
 		self._note_id_pool = it.chain.from_iterable(
 			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
-		self._renderer = NotificationDisplay()
+		self._renderer = NotificationDisplay(
+			optz.layout_margin, optz.layout_anchor, optz.layout_direction )
 		self._activity_event()
 
 
@@ -365,12 +55,12 @@ class NotificationDaemon(dbus.service.Object):
 				log.debug( 'Ignoring inacivity timeout event'
 					' due to existing windows (retry in {}s).'.format(optz.activity_timeout) )
 				self._activity_timer = None
-		if self._activity_timer: gobject.source_remove(self._activity_timer)
-		self._activity_timer = gobject.timeout_add_seconds(
+		if self._activity_timer: GObject.source_remove(self._activity_timer)
+		self._activity_timer = GObject.timeout_add_seconds(
 			optz.activity_timeout, self._activity_event, True )
 
-	_dbus_method = ft.partial(dbus.service.method, dbus_id)
-	_dbus_signal = ft.partial(dbus.service.signal, dbus_id)
+	_dbus_method = ft.partial(dbus.service.method, core.dbus_id)
+	_dbus_signal = ft.partial(dbus.service.signal, core.dbus_id)
 
 
 	@_dbus_method('', 'ssss')
@@ -451,13 +141,17 @@ class NotificationDaemon(dbus.service.Object):
 
 	@_dbus_method('susssasa{sv}i', 'u')
 	def Notify(self, app_name, nid, icon, summary, body, actions, hints, timeout):
-		self._activity_event()
-		note = Notification.from_dbus(
-			app_name, nid, icon, summary, body, actions, hints, timeout )
-		try: return self.filter(note)
-		except Exception:
-			log.exception('Unhandled error')
-			return 0
+		try:
+			self._activity_event()
+			note = core.Notification.from_dbus(
+				app_name, nid, icon, summary, body, actions, hints, timeout )
+			try: return self.filter(note)
+			except Exception:
+				log.exception('Unhandled error')
+				return 0
+		except Exception as err:
+			print(err, core.ext_traceback())
+			exit()
 
 	@_dbus_method('u', '')
 	def CloseNotification(self, nid):
@@ -477,10 +171,11 @@ class NotificationDaemon(dbus.service.Object):
 			except (OSError, IOError): return True
 			if ts > mtime:
 				mtime = ts
-				init_env({'~': lambda regex, string: bool(re.search(regex, string))})
-				try: cb = load(optz.filter_file)
+				core.scheme_init_env({ '~':
+					lambda regex, string: bool(re.search(regex, string)) })
+				try: cb = core.scheme_load(optz.filter_file)
 				except:
-					ex, self._filter_callback = ext_traceback(), (None, 0)
+					ex, self._filter_callback = core.ext_traceback(), (None, 0)
 					log.debug('Failed to load notification filters (from {}):\n{}'.format(optz.filter_file, ex))
 					if optz.status_notify:
 						self.display('Notification proxy: failed to load notification filters', ex)
@@ -492,7 +187,7 @@ class NotificationDaemon(dbus.service.Object):
 		elif not callable(cb): return bool(cb)
 		try: return cb(summary, body)
 		except:
-			ex = ext_traceback()
+			ex = core.ext_traceback()
 			log.debug('Failed to execute notification filters:\n{}'.format(ex))
 			if optz.status_notify:
 				self.display('Notification proxy: notification filters failed', ex)
@@ -515,7 +210,7 @@ class NotificationDaemon(dbus.service.Object):
 		except KeyError: urgency = None
 
 		plug = self.plugged or (optz.fs_check and self._fullscreen_check)
-		urgent = optz.urgency_check and urgency == urgency_levels.critical
+		urgent = optz.urgency_check and urgency == core.urgency_levels.critical
 
 		if urgent: # special case - no buffer checks
 			self._note_limit.consume()
@@ -552,11 +247,11 @@ class NotificationDaemon(dbus.service.Object):
 
 	def flush(self, force=False, timeout=None):
 		if self._flush_timer:
-			gobject.source_remove(self._flush_timer)
+			GObject.source_remove(self._flush_timer)
 			self._flush_timer = None
 		if timeout:
 			log.debug('Scheduled notification buffer flush in {}s'.format(timeout))
-			self._flush_timer = gobject.timeout_add(int(timeout * 1000), self.flush)
+			self._flush_timer = GObject.timeout_add(int(timeout * 1000), self.flush)
 			return
 		if not self._note_buffer:
 			log.debug('Flush event with empty notification buffer')
@@ -569,14 +264,15 @@ class NotificationDaemon(dbus.service.Object):
 		if not force:
 			if optz.fs_check and (self.plugged or self._fullscreen_check):
 				log.debug( '{} detected, delaying buffer flush by {}s'\
-					.format(('Fullscreen window' if not self.plugged else 'Plug'), poll_interval) )
+					.format(( 'Fullscreen window'
+						if not self.plugged else 'Plug' ), poll_interval) )
 				self.flush(timeout=poll_interval)
 				return
 
 		if self._note_buffer:
 			# Decided not to use replace_id here - several feeds are okay
 			self._flush_id = self.display( self._note_buffer[0]\
-				if len(self._note_buffer) == 1 else Notification(
+				if len(self._note_buffer) == 1 else core.Notification(
 					'Feed' if not self._note_buffer.dropped
 						else 'Feed ({} dropped)'.format(self._note_buffer.dropped),
 					'\n\n'.join(it.starmap( '--- {}\n  {}'.format,
@@ -587,8 +283,9 @@ class NotificationDaemon(dbus.service.Object):
 
 
 	def display(self, note_or_summary, *argz, **kwz):
-		note = note_or_summary if isinstance(note_or_summary, Notification)\
-			else Notification(note_or_summary, *argz, **kwz)
+		note = note_or_summary\
+			if isinstance(note_or_summary, core.Notification)\
+			else core.Notification(note_or_summary, *argz, **kwz)
 
 		if note.replaces_id in self._note_windows:
 			self.close(note.replaces_id, close_reasons.closed)
@@ -604,7 +301,7 @@ class NotificationDaemon(dbus.service.Object):
 
 		if self.timeout_cleanup and note.timeout > 0:
 			note.timer_created, note.timer_left = time(), note.timeout / 1000.0
-			note.timer_id = gobject.timeout_add(
+			note.timer_id = GObject.timeout_add(
 				note.timeout, self.close, nid, close_reasons.expired )
 
 		log.debug( 'Created notification (id: {}, timeout: {} (ms))'\
@@ -615,7 +312,7 @@ class NotificationDaemon(dbus.service.Object):
 		if nid:
 			note = self._note_windows.get(nid, None)
 			if note:
-				if getattr(note, 'timer_id', None): gobject.source_remove(note.timer_id)
+				if getattr(note, 'timer_id', None): GObject.source_remove(note.timer_id)
 
 				if delay is None: del self._note_windows[nid]
 				elif 'timer_id' in note: # these get sent very often
@@ -625,7 +322,7 @@ class NotificationDaemon(dbus.service.Object):
 								note.timer_left - (time() - note.timer_created)
 					else:
 						note.timer_created = time()
-						note.timer_id = gobject.timeout_add(
+						note.timer_id = GObject.timeout_add(
 							int(max(note.timer_left, 1) * 1000),
 							self.close, nid, close_reasons.expired )
 					return
@@ -642,8 +339,72 @@ class NotificationDaemon(dbus.service.Object):
 			for nid in self._note_windows.keys(): self.close(nid, reason)
 
 
+def main():
+	global optz, log
+	import argparse
 
-daemon = NotificationDaemon(bus, dbus_path, dbus.service.BusName(dbus_id, bus))
-loop = gobject.MainLoop()
-log.debug('Starting gobject loop')
-loop.run()
+	def EnumAction(enum):
+		class EnumAction(argparse.Action):
+			def __call__(self, parser, namespace, values, option_string=None):
+				setattr(namespace, self.dest, self.enum[values])
+		EnumAction.enum = enum
+		return EnumAction
+
+	parser = argparse.ArgumentParser(description='Desktop notification server.')
+
+	parser.add_argument('-f', '--no-fs-check',
+		action='store_false', dest='fs_check', default=True,
+		help='Dont queue messages if active window is fullscreen')
+	parser.add_argument('-u', '--no-urgency-check',
+		action='store_false', dest='urgency_check', default=True,
+		help='Queue messages even if urgency is critical')
+	parser.add_argument('-c', '--activity-timeout', type=int, default=int(optz['activity_timeout']),
+		help='No-activity (dbus calls) timeout before closing the daemon instance'
+			' (less or equal zero - infinite, default: %(default)ss)')
+	parser.add_argument('--no-status-notify',
+		action='store_false', dest='status_notify', default=True,
+		help='Do not send notification on changes in proxy settings.')
+	parser.add_argument('--filter-file', default='~/.notification_filter',
+		help='Read simple scheme rules for filtering notifications from file (default: %(default)s).')
+
+	parser.add_argument('-t', '--popup-timeout', type=int, default=int(optz['popup_timeout']*1000),
+		help='Default timeout for notification popups removal (default: %(default)sms)')
+	parser.add_argument('-q', '--queue-len', type=int, default=optz['queue_len'],
+		help='How many messages should be queued on tbf overflow  (default: %(default)s)')
+
+	parser.add_argument('--layout-anchor', choices=core.layout_anchor,
+		action=EnumAction(core.layout_anchor), default=core.layout_anchor.top_left,
+		help='Screen corner notifications gravitate to (default: top_left).')
+	parser.add_argument('--layout-direction', choices=core.layout_direction,
+		action=EnumAction(core.layout_direction), default=core.layout_direction.vertical,
+		help='Direction for notification stack growth from --layout-anchor corner (default: vertical).')
+	parser.add_argument('--layout-margin', default=3,
+		help='Margin between notifications, screen edges, and some misc stuff (default: %(default)spx).')
+
+	parser.add_argument('--tbf-size', type=int, default=optz['tbf_size'],
+		help='Token-bucket message-flow filter (tbf) bucket size (default: %(default)s)')
+	parser.add_argument('--tbf-tick', type=int, default=optz['tbf_tick'],
+		help='tbf update interval (new token), so token_inflow = token / tbf_tick (default: %(default)ss)')
+	parser.add_argument('--tbf-max-delay', type=int, default=optz['tbf_max_delay'],
+		help='Maxmum amount of seconds, between message queue flush (default: %(default)ss)')
+	parser.add_argument('--tbf-inc', type=int, default=optz['tbf_inc'],
+		help='tbf_tick multiplier on consequent tbf overflow (default: %(default)s)')
+	parser.add_argument('--tbf-dec', type=int, default=optz['tbf_dec'],
+		help='tbf_tick divider on successful grab from non-empty bucket,'
+			' wont lower multiplier below 1 (default: %(default)s)')
+
+	parser.add_argument('--debug', action='store_true', help='Enable debug logging to stderr.')
+
+	optz = parser.parse_args()
+	optz.filter_file = os.path.expanduser(optz.filter_file)
+	core.Notification.default_timeout = optz.popup_timeout
+
+	import logging
+	logging.basicConfig(level=logging.DEBUG if optz.debug else logging.WARNING)
+	log = logging.getLogger()
+
+	daemon = NotificationDaemon( bus,
+		core.dbus_path, dbus.service.BusName(core.dbus_id, bus) )
+	loop = GObject.MainLoop()
+	log.debug('Starting gobject loop')
+	loop.run()
