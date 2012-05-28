@@ -46,17 +46,43 @@ Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here 
 it's usually used to send the messages, not receive and display them.
 
 
-Installation / Usage
+Installation
 --------------------
 
-Just make sure nothing else is already listening on the same dbus path/interface and start
-the script by hand or install it as a dbus service file to be started whenever
-notifications arrive (and exiting during silence timeouts).
+It's a regular package for Python 2.7 (not 3.X), but not in pypi, so can be
+installed from a checkout with something like that:
 
-    cp notification-thing.py /usr/libexec/notification-thing
-    cp org.freedesktop.Notifications.service /usr/share/dbus-1/services/
+	% python setup.py install
 
-File ~/.notification_filter can be used to control filtering mechanism.
+Note that to install stuff in system-wide PATH and site-packages, elevated
+privileges are often required.
+Use
+[~/.pydistutils.cfg](http://docs.python.org/install/index.html#distutils-configuration-files)
+or [virtualenv](http://pypi.python.org/pypi/virtualenv) to do unprivileged
+installs into custom paths.
+
+Better way would be to use [pip](http://pip-installer.org/) to install all the
+necessary dependencies as well:
+
+	% pip install -e 'git://github.com/mk-fg/notification-thing.git#egg=notification-thing'
+
+Alternatively, `./notification-thing` can be run right from the checkout tree,
+without any installation.
+
+
+Usage
+--------------------
+
+Just make sure nothing else is already listening on the same dbus path/interface
+and start the daemon by hand.
+
+Alternatively, dbus service file can be installed, so daemon can be started
+whenever notifications arrive (and exiting during silence timeouts):
+
+	cp org.freedesktop.Notifications.service /usr/share/dbus-1/services/
+
+File ~/.notification_filter can be used to control filtering mechanism at
+runtime.
 
 It's the simple scheme script, see
 [fgc.scheme](https://github.com/mk-fg/fgc/blob/master/fgc/scheme.py) or
@@ -67,31 +93,31 @@ It's evaluation should return the function which will be called for each
 notification and should return either #t or #f verdict for whether to display it
 or not. Example:
 
-    (define-macro define-matcher (lambda
-      (name op comp last rev-args)
-      `(define ,name (lambda args
-        (if (= (length args) 1) ,last
-          (let ((atom (car args)) (args (cdr args)))
-            (,comp
-              (,op ,@(if rev-args '((car args) atom) '(atom (car args))))
-              (apply ,name (cons atom (cdr args))))))))))
+	(define-macro define-matcher (lambda
+	  (name op comp last rev-args)
+	  `(define ,name (lambda args
+	    (if (= (length args) 1) ,last
+	      (let ((atom (car args)) (args (cdr args)))
+	        (,comp
+	          (,op ,@(if rev-args '((car args) atom) '(atom (car args))))
+	          (apply ,name (cons atom (cdr args))))))))))
 
-    (define-matcher ~all ~ and #t #f)
-    (define-matcher all~ ~ and #t #t)
-    (define-matcher ~any ~ or #f #f)
-    (define-matcher any~ ~ or #f #t)
-    (define-matcher =any ~ or #f #f)
+	(define-matcher ~all ~ and #t #f)
+	(define-matcher all~ ~ and #t #t)
+	(define-matcher ~any ~ or #f #f)
+	(define-matcher any~ ~ or #f #t)
+	(define-matcher =any ~ or #f #f)
 
-    (lambda (summary body)
-      (not (or
-        ;; hl-only high-traffic channels
-        (and
-          (=any summary "erc: #gunicorn")
-          (not (~ "MK_FG" body)))
-        ;; irrelevant service messages
-        (and
-          (~ "^erc: #\S+" summary)
-          (~ "^\*\*\* #\S+ (was created on|modes:) " body)))))
+	(lambda (summary body)
+	  (not (or
+	    ;; hl-only high-traffic channels
+	    (and
+	      (=any summary "erc: #gunicorn")
+	      (not (~ "MK_FG" body)))
+	    ;; irrelevant service messages
+	    (and
+	      (~ "^erc: #\S+" summary)
+	      (~ "^\*\*\* #\S+ (was created on|modes:) " body)))))
 
 ~/.notification_filter is reloaded on-the-fly if updated, any errors there will
 yield backtraces in notification windows.
@@ -99,59 +125,59 @@ yield backtraces in notification windows.
 Lots of tunable options are available, but all-defaults should be the norm
 (naturally I use the defaults myself, because I'm the one who sets them;).
 
-    ~% /usr/libexec/notification-thing -h
-    usage: notification-thing [-h] [-f] [-u] [-c ACTIVITY_TIMEOUT]
-                              [--no-status-notify] [--filter-file FILTER_FILE]
-                              [-t POPUP_TIMEOUT] [-q QUEUE_LEN]
-                              [--layout-anchor {top_right,bottom_left,bottom_right,top_left}]
-                              [--layout-direction {horizontal,vertical}]
-                              [--layout-margin LAYOUT_MARGIN]
-                              [--tbf-size TBF_SIZE] [--tbf-tick TBF_TICK]
-                              [--tbf-max-delay TBF_MAX_DELAY] [--tbf-inc TBF_INC]
-                              [--tbf-dec TBF_DEC] [--debug]
+	~% /usr/libexec/notification-thing -h
+	usage: notification-thing [-h] [-f] [-u] [-c ACTIVITY_TIMEOUT]
+	                          [--no-status-notify] [--filter-file FILTER_FILE]
+	                          [-t POPUP_TIMEOUT] [-q QUEUE_LEN]
+	                          [--layout-anchor {top_right,bottom_left,bottom_right,top_left}]
+	                          [--layout-direction {horizontal,vertical}]
+	                          [--layout-margin LAYOUT_MARGIN]
+	                          [--tbf-size TBF_SIZE] [--tbf-tick TBF_TICK]
+	                          [--tbf-max-delay TBF_MAX_DELAY] [--tbf-inc TBF_INC]
+	                          [--tbf-dec TBF_DEC] [--debug]
 
-    Desktop notification server.
+	Desktop notification server.
 
-    optional arguments:
-      -h, --help            show this help message and exit
-      -f, --no-fs-check     Dont queue messages if active window is fullscreen
-      -u, --no-urgency-check
-                            Queue messages even if urgency is critical
-      -c ACTIVITY_TIMEOUT, --activity-timeout ACTIVITY_TIMEOUT
-                            No-activity (dbus calls) timeout before closing the
-                            daemon instance (less or equal zero - infinite,
-                            default: 300s)
-      --no-status-notify    Do not send notification on changes in proxy settings.
-      --filter-file FILTER_FILE
-                            Read simple scheme rules for filtering notifications
-                            from file (default: ~/.notification_filter).
-      -t POPUP_TIMEOUT, --popup-timeout POPUP_TIMEOUT
-                            Default timeout for notification popups removal
-                            (default: 5000ms)
-      -q QUEUE_LEN, --queue-len QUEUE_LEN
-                            How many messages should be queued on tbf overflow
-                            (default: 10)
-      --layout-anchor {top_right,bottom_left,bottom_right,top_left}
-                            Screen corner notifications gravitate to (default:
-                            top_left).
-      --layout-direction {horizontal,vertical}
-                            Direction for notification stack growth from --layout-
-                            anchor corner (default: vertical).
-      --layout-margin LAYOUT_MARGIN
-                            Margin between notifications, screen edges, and some
-                            misc stuff (default: 3px).
-      --tbf-size TBF_SIZE   Token-bucket message-flow filter (tbf) bucket size
-                            (default: 4)
-      --tbf-tick TBF_TICK   tbf update interval (new token), so token_inflow =
-                            token / tbf_tick (default: 15s)
-      --tbf-max-delay TBF_MAX_DELAY
-                            Maxmum amount of seconds, between message queue flush
-                            (default: 60s)
-      --tbf-inc TBF_INC     tbf_tick multiplier on consequent tbf overflow
-                            (default: 2)
-      --tbf-dec TBF_DEC     tbf_tick divider on successful grab from non-empty
-                            bucket, wont lower multiplier below 1 (default: 2)
-      --debug               Enable debug logging to stderr.
+	optional arguments:
+	  -h, --help            show this help message and exit
+	  -f, --no-fs-check     Dont queue messages if active window is fullscreen
+	  -u, --no-urgency-check
+	                        Queue messages even if urgency is critical
+	  -c ACTIVITY_TIMEOUT, --activity-timeout ACTIVITY_TIMEOUT
+	                        No-activity (dbus calls) timeout before closing the
+	                        daemon instance (less or equal zero - infinite,
+	                        default: 300s)
+	  --no-status-notify    Do not send notification on changes in proxy settings.
+	  --filter-file FILTER_FILE
+	                        Read simple scheme rules for filtering notifications
+	                        from file (default: ~/.notification_filter).
+	  -t POPUP_TIMEOUT, --popup-timeout POPUP_TIMEOUT
+	                        Default timeout for notification popups removal
+	                        (default: 5000ms)
+	  -q QUEUE_LEN, --queue-len QUEUE_LEN
+	                        How many messages should be queued on tbf overflow
+	                        (default: 10)
+	  --layout-anchor {top_right,bottom_left,bottom_right,top_left}
+	                        Screen corner notifications gravitate to (default:
+	                        top_left).
+	  --layout-direction {horizontal,vertical}
+	                        Direction for notification stack growth from --layout-
+	                        anchor corner (default: vertical).
+	  --layout-margin LAYOUT_MARGIN
+	                        Margin between notifications, screen edges, and some
+	                        misc stuff (default: 3px).
+	  --tbf-size TBF_SIZE   Token-bucket message-flow filter (tbf) bucket size
+	                        (default: 4)
+	  --tbf-tick TBF_TICK   tbf update interval (new token), so token_inflow =
+	                        token / tbf_tick (default: 15s)
+	  --tbf-max-delay TBF_MAX_DELAY
+	                        Maxmum amount of seconds, between message queue flush
+	                        (default: 60s)
+	  --tbf-inc TBF_INC     tbf_tick multiplier on consequent tbf overflow
+	                        (default: 2)
+	  --tbf-dec TBF_DEC     tbf_tick divider on successful grab from non-empty
+	                        bucket, wont lower multiplier below 1 (default: 2)
+	  --debug               Enable debug logging to stderr.
 
 Use --debug option to get a verbose log of all that's happening there, which
 decisions are made and based on what data.
@@ -162,26 +188,26 @@ few functions, more info on which can be found
 and [here](http://blog.fraggod.net/2011/8/Notification-daemon-in-python). For
 example, to temporarily block/unblock all but the urgent notifications:
 
-    dbus-send --type=method_call\
-      --dest=org.freedesktop.Notifications
-      /org/freedesktop/Notifications\
-      org.freedesktop.Notifications.Set\
-      dict:string:boolean:plug_toggle,true
+	dbus-send --type=method_call\
+	  --dest=org.freedesktop.Notifications
+	  /org/freedesktop/Notifications\
+	  org.freedesktop.Notifications.Set\
+	  dict:string:boolean:plug_toggle,true
 
 Appearance (and some behavior) of the popup windows is subject to [gtk3
 styles](http://developer.gnome.org/gtk3/3.1/GtkCssProvider.html) (simple css
 files), with default being the light one (see the actual code for up-to-date
 stylesheet though):
 
-    #notification { background-color: white; }
-    #notification #hs { background-color: black; }
+	#notification { background-color: white; }
+	#notification #hs { background-color: black; }
 
-    #notification #critical { background-color: #ffaeae; }
-    #notification #normal { background-color: #f0ffec; }
-    #notification #low { background-color: #bee3c6; }
+	#notification #critical { background-color: #ffaeae; }
+	#notification #normal { background-color: #f0ffec; }
+	#notification #low { background-color: #bee3c6; }
 
-    #notification #summary {
-      font-size: 10;
-      text-shadow: 1 1 0 gray;
-    }
-    #notification #body { font-size: 8; }
+	#notification #summary {
+	  font-size: 10;
+	  text-shadow: 1 1 0 gray;
+	}
+	#notification #body { font-size: 8; }
