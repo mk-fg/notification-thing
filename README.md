@@ -106,15 +106,17 @@ or not. Example:
 	(define-matcher all~ ~ and #t #t)
 	(define-matcher ~any ~ or #f #f)
 	(define-matcher any~ ~ or #f #t)
-	(define-matcher =any ~ or #f #f)
 
 	(lambda (summary body)
 	  (not (or
 	    ;; hl-only high-traffic channels
 	    (and
-	      (=any summary "erc: #gunicorn")
+	      (any~ summary
+	        "^erc: #(gunicorn|zeromq|bookz)$"
+	        "^erc: #anon")
 	      (not (~ "MK_FG" body)))
 	    ;; irrelevant service messages
+	    (~ "Undefined CTCP query received. Silently ignored" body)
 	    (and
 	      (~ "^erc: #\S+" summary)
 	      (~ "^\*\*\* #\S+ (was created on|modes:) " body)))))
@@ -125,10 +127,11 @@ yield backtraces in notification windows.
 Lots of tunable options are available, but all-defaults should be the norm
 (naturally I use the defaults myself, because I'm the one who sets them;).
 
-	~% /usr/libexec/notification-thing -h
+	% notification-thing -h
 	usage: notification-thing [-h] [-f] [-u] [-c ACTIVITY_TIMEOUT]
-	                          [--no-status-notify] [--filter-file FILTER_FILE]
-	                          [-t POPUP_TIMEOUT] [-q QUEUE_LEN]
+	                          [--no-status-notify] [--filter-file PATH]
+	                          [--filter-test SUMMARY BODY] [-t POPUP_TIMEOUT]
+	                          [-q QUEUE_LEN]
 	                          [--layout-anchor {top_right,bottom_left,bottom_right,top_left}]
 	                          [--layout-direction {horizontal,vertical}]
 	                          [--layout-margin LAYOUT_MARGIN]
@@ -146,11 +149,14 @@ Lots of tunable options are available, but all-defaults should be the norm
 	  -c ACTIVITY_TIMEOUT, --activity-timeout ACTIVITY_TIMEOUT
 	                        No-activity (dbus calls) timeout before closing the
 	                        daemon instance (less or equal zero - infinite,
-	                        default: 300s)
+	                        default: 600s)
 	  --no-status-notify    Do not send notification on changes in proxy settings.
-	  --filter-file FILTER_FILE
-	                        Read simple scheme rules for filtering notifications
+	  --filter-file PATH    Read simple scheme rules for filtering notifications
 	                        from file (default: ~/.notification_filter).
+	  --filter-test SUMMARY BODY
+	                        Do not start daemon, just test given summary and body
+	                        against filter-file and print the result back to
+	                        terminal.
 	  -t POPUP_TIMEOUT, --popup-timeout POPUP_TIMEOUT
 	                        Default timeout for notification popups removal
 	                        (default: 5000ms)

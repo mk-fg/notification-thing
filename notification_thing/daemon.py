@@ -6,7 +6,7 @@ import itertools as it, operator as op, functools as ft
 from time import time
 from dbus.mainloop.glib import DBusGMainLoop
 import dbus, dbus.service
-import os, sys, re
+import os, sys
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -141,17 +141,13 @@ class NotificationDaemon(dbus.service.Object):
 
 	@_dbus_method('susssasa{sv}i', 'u')
 	def Notify(self, app_name, nid, icon, summary, body, actions, hints, timeout):
-		try:
-			self._activity_event()
-			note = core.Notification.from_dbus(
-				app_name, nid, icon, summary, body, actions, hints, timeout )
-			try: return self.filter(note)
-			except Exception:
-				log.exception('Unhandled error')
-				return 0
-		except Exception as err:
-			print(err, core.ext_traceback())
-			exit()
+		self._activity_event()
+		note = core.Notification.from_dbus(
+			app_name, nid, icon, summary, body, actions, hints, timeout )
+		try: return self.filter(note)
+		except Exception:
+			log.exception('Unhandled error')
+			return 0
 
 	@_dbus_method('u', '')
 	def CloseNotification(self, nid):
@@ -171,12 +167,11 @@ class NotificationDaemon(dbus.service.Object):
 			except (OSError, IOError): return True
 			if ts > mtime:
 				mtime = ts
-				core.scheme_init_env({ '~':
-					lambda regex, string: bool(re.search(regex, string)) })
-				try: cb = core.scheme_load(optz.filter_file)
+				try: cb = core.get_filter(optz.filter_file)
 				except:
 					ex, self._filter_callback = core.ext_traceback(), (None, 0)
-					log.debug('Failed to load notification filters (from {}):\n{}'.format(optz.filter_file, ex))
+					log.debug( 'Failed to load'
+						' notification filters (from {}):\n{}'.format(optz.filter_file, ex) )
 					if optz.status_notify:
 						self.display('Notification proxy: failed to load notification filters', ex)
 					return True
@@ -364,8 +359,12 @@ def main():
 	parser.add_argument('--no-status-notify',
 		action='store_false', dest='status_notify', default=True,
 		help='Do not send notification on changes in proxy settings.')
-	parser.add_argument('--filter-file', default='~/.notification_filter',
+
+	parser.add_argument('--filter-file', default='~/.notification_filter', metavar='PATH',
 		help='Read simple scheme rules for filtering notifications from file (default: %(default)s).')
+	parser.add_argument('--filter-test', nargs=2, metavar=('SUMMARY', 'BODY'),
+		help='Do not start daemon, just test given summary'
+			' and body against filter-file and print the result back to terminal.')
 
 	parser.add_argument('-t', '--popup-timeout', type=int, default=int(optz['popup_timeout']*1000),
 		help='Default timeout for notification popups removal (default: %(default)sms)')
@@ -399,6 +398,14 @@ def main():
 	optz.filter_file = os.path.expanduser(optz.filter_file)
 	core.Notification.default_timeout = optz.popup_timeout
 
+	if optz.filter_test:
+		func = core.get_filter(optz.filter_file)
+		filtering_result = func(*optz.filter_test)
+		msg_repr = 'Message - summary: {!r}, body: {!r}'.format(*optz.filter_test)
+		print('{}\nFiltering result: {} ({})'.format( msg_repr,
+			filtering_result, 'will pass' if filtering_result else "won't pass" ))
+		sys.exit()
+
 	import logging
 	logging.basicConfig(level=logging.DEBUG if optz.debug else logging.WARNING)
 	log = logging.getLogger()
@@ -408,3 +415,6 @@ def main():
 	loop = GObject.MainLoop()
 	log.debug('Starting gobject loop')
 	loop.run()
+
+
+if __name__ == '__main__': main()

@@ -2,9 +2,9 @@
 from __future__ import unicode_literals, print_function
 
 import itertools as it, operator as op, functools as ft
-import dbus, argparse
+import dbus, argparse, re
 
-from fgc.scheme import load as scheme_load, init_env as scheme_init_env
+from fgc.scheme import load, init_env
 from fgc.fc import FC_TokenBucket, RRQ
 from fgc.err import ext_traceback
 
@@ -69,3 +69,8 @@ class Notification(dict):
 		if not k.startswith('__'): return self[k]
 		else: raise AttributeError
 	def __setattr__(self, k, v): self[k] = v
+
+
+init_env({ '~':
+	lambda regex, string: bool(re.search(regex, string)) })
+def get_filter(path): return load(path)
