@@ -144,6 +144,7 @@ class NotificationDaemon(dbus.service.Object):
 		self._activity_event()
 		note = core.Notification.from_dbus(
 			app_name, nid, icon, summary, body, actions, hints, timeout )
+		if nid: self.close(nid, reason=close_reasons.closed)
 		try: return self.filter(note)
 		except Exception:
 			log.exception('Unhandled error')
