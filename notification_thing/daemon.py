@@ -39,7 +39,8 @@ class NotificationDaemon(dbus.service.Object):
 		self._note_id_pool = it.chain.from_iterable(
 			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
 		self._renderer = NotificationDisplay(
-			optz.layout_margin, optz.layout_anchor, optz.layout_direction, optz.img_w, optz.img_h)
+			optz.layout_margin, optz.layout_anchor,
+			optz.layout_direction, optz.icon_width, optz.icon_height )
 		self._activity_event()
 
 
@@ -380,6 +381,10 @@ def main():
 		help='Direction for notification stack growth from --layout-anchor corner (default: vertical).')
 	parser.add_argument('--layout-margin', default=3,
 		help='Margin between notifications, screen edges, and some misc stuff (default: %(default)spx).')
+	parser.add_argument('--icon-width', '--img-w', type=int, metavar='px',
+		help='Scale icon (preserving aspect ratio) to width.')
+	parser.add_argument('--icon-height', '--img-h', type=int, metavar='px',
+		help='Scale icon (preserving aspect ratio) to height.')
 
 	parser.add_argument('--tbf-size', type=int, default=optz['tbf_size'],
 		help='Token-bucket message-flow filter (tbf) bucket size (default: %(default)s)')
@@ -392,10 +397,6 @@ def main():
 	parser.add_argument('--tbf-dec', type=int, default=optz['tbf_dec'],
 		help='tbf_tick divider on successful grab from non-empty bucket,'
 			' wont lower multiplier below 1 (default: %(default)s)')
-	parser.add_argument('--img-w', type=int, default=optz["img_w"],
-		help='max image icon width')
-	parser.add_argument('--img-h', type=int, default=optz["img_h"],
-		help='max image icon height')
 
 	parser.add_argument('--debug', action='store_true', help='Enable debug logging to stderr.')
 

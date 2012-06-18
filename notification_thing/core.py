@@ -28,8 +28,7 @@ class Enum(dict):
 ####
 
 optz = dict( activity_timeout=10*60, popup_timeout=5, queue_len=10,
-	tbf_size=4, tbf_tick=15, tbf_max_delay=60, tbf_inc=2, tbf_dec=2, 
-	img_w=-1, img_h=-1)
+	tbf_size=4, tbf_tick=15, tbf_max_delay=60, tbf_inc=2, tbf_dec=2 )
 poll_interval = 60
 
 dbus_id = 'org.freedesktop.Notifications'

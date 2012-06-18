@@ -22,15 +22,16 @@ class NotificationDisplay(object):
 		Current implementation based on notipy: git://github.com/the-isz/notipy.git'''
 	window = namedtuple('Window', 'gobj event_boxes')
 
-	def __init__(self, layout_margin, layout_anchor, layout_direction, img_w, img_h):
+	def __init__( self, layout_margin,
+			layout_anchor, layout_direction, icon_width, icon_height ):
 		self.margins = dict(it.chain.from_iterable(map(
 			lambda ax: ( (2**ax, layout_margin),
 				(-2**ax, layout_margin) ), xrange(2) )))
 		self.layout_margin = layout_margin
 		self.layout_anchor = layout_anchor
 		self.layout_direction = layout_direction
-		self.img_w = img_w
-		self.img_h = img_h
+		self.icon_width = icon_width
+		self.icon_height = icon_height
 
 		self._windows = OrderedDict()
 
@@ -79,19 +80,13 @@ class NotificationDisplay(object):
 		frame = Gtk.Frame(shadow_type=Gtk.ShadowType.ETCHED_OUT)
 		win.add(frame)
 
-		widget_icon = None
+		widget_icon = widget_pixbuf = None
 		if icon is not None:
 			if isinstance(icon, unicode):
 				icon_path = os.path.expanduser(urllib.url2pathname(icon))
 				if icon_path.startswith('file://'): icon_path = icon_path[7:]
 				if os.path.isfile(icon_path):
-					widget_icon = Gtk.Image()
-					if self.img_w != -1 or self.img_h != -1:
-						pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, self.img_w, self.img_h)
-						#scaled_buf = pixbuf.scale_simple(self.img_w, self.img_h, gtk.gdk.INTERP_BILINEAR)
-						widget_icon.set_from_pixbuf(pixbuf)
-					else:
-						widget_icon.set_from_file(icon_path)
+					widget_pixbuf = GdkPixbuf.Pixbuf.new_from_file(icon_path)
 				else:
 					# available names: Gtk.IconTheme.get_default().list_icons(None)
 					theme = Gtk.IconTheme.get_default()
@@ -116,11 +111,25 @@ class NotificationDisplay(object):
 				# data, colorspace, has_alpha, bits_per_sample,
 				#  width, height, rowstride, destroy_fn, destroy_fn_data
 				# XXX: Do I need to free the image via a function callback?
-				pixbuf = GdkPixbuf.Pixbuf.new_from_data(
+				widget_pixbuf = GdkPixbuf.Pixbuf.new_from_data(
 					bytearray(icon[6]), GdkPixbuf.Colorspace.RGB, icon[3], icon[4],
 					icon[0], icon[1], icon[2], lambda x, y: None, None )
-				widget_icon = Gtk.Image()
-				widget_icon.set_from_pixbuf(pixbuf)
+
+		if not widget_icon and widget_pixbuf:
+			widget_icon = Gtk.Image()
+			if self.icon_width or self.icon_height: # scale icon
+				w, h = widget_pixbuf.get_width(), widget_pixbuf.get_height()
+				# Use max (among w/h) factor on scale-up and min on scale-down,
+				#  so resulting icon will always fit in a specified box,
+				#  and will match it by (at least) w or h (ideally - both)
+				scale = (self.icon_width and w > self.icon_width)\
+					or (self.icon_height and h > self.icon_height) # True if it's a scale-up
+				scale = (min if bool(scale) ^ bool(
+						self.icon_width and self.icon_height ) else max)\
+					(float(self.icon_width or w) / w, float(self.icon_height or h) / h)
+				widget_pixbuf = widget_pixbuf.scale_simple(
+					w * scale, h * scale, GdkPixbuf.InterpType.BILINEAR )
+			widget_icon.set_from_pixbuf(widget_pixbuf)
 
 		v_box = Gtk.VBox(spacing=self.layout_margin, expand=False)
 		if widget_icon is not None:
