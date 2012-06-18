@@ -35,9 +35,7 @@ setup(
 		'Programming Language :: Python :: 2 :: Only',
 		'Topic :: Desktop Environment' ],
 
-	dependency_links = [
-		'git://github.com/mk-fg/fgc.git#egg=fgc',
-		'https://live.gnome.org/PyGObject#Source' ],
+	dependency_links = ['https://live.gnome.org/PyGObject#Source'],
 
 	packages = find_packages(),
 

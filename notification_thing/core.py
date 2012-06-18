@@ -4,9 +4,8 @@ from __future__ import unicode_literals, print_function
 import itertools as it, operator as op, functools as ft
 import dbus, argparse, re
 
-from fgc.scheme import load, init_env
-from fgc.fc import FC_TokenBucket, RRQ
-from fgc.err import ext_traceback
+from .scheme import load, init_env
+from .rate_control import FC_TokenBucket, RRQ
 
 
 class Enum(dict):

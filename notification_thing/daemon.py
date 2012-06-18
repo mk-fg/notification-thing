@@ -6,7 +6,7 @@ import itertools as it, operator as op, functools as ft
 from time import time
 from dbus.mainloop.glib import DBusGMainLoop
 import dbus, dbus.service
-import os, sys
+import os, sys, traceback
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -171,7 +171,7 @@ class NotificationDaemon(dbus.service.Object):
 				mtime = ts
 				try: cb = core.get_filter(optz.filter_file)
 				except:
-					ex, self._filter_callback = core.ext_traceback(), (None, 0)
+					ex, self._filter_callback = traceback.format_exc(), (None, 0)
 					log.debug( 'Failed to load'
 						' notification filters (from {}):\n{}'.format(optz.filter_file, ex) )
 					if optz.status_notify:
@@ -184,7 +184,7 @@ class NotificationDaemon(dbus.service.Object):
 		elif not callable(cb): return bool(cb)
 		try: return cb(summary, body)
 		except:
-			ex = core.ext_traceback()
+			ex = traceback.format_exc()
 			log.debug('Failed to execute notification filters:\n{}'.format(ex))
 			if optz.status_notify:
 				self.display('Notification proxy: notification filters failed', ex)

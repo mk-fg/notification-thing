@@ -36,11 +36,6 @@ Requirements
 * GTK+ 3.X and
   [gobject-introspection](https://live.gnome.org/GObjectIntrospection/)-enabled
   [pygobject](http://live.gnome.org/PyGObject)
-* Some [fgc modules](https://github.com/mk-fg/fgc)
-  ([fgc.fc](https://github.com/mk-fg/fgc/blob/master/fgc/fc.py) for
-  rate-limiting,
-  [fgc.scheme](https://github.com/mk-fg/fgc/blob/master/fgc/scheme.py) for
-  filtering, etc).
 
 Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here -
 it's usually used to send the messages, not receive and display them.
@@ -84,9 +79,9 @@ whenever notifications arrive (and exiting during silence timeouts):
 File ~/.notification_filter can be used to control filtering mechanism at
 runtime.
 
-It's the simple scheme script, see
-[fgc.scheme](https://github.com/mk-fg/fgc/blob/master/fgc/scheme.py) or
-[original Peter Norvig's implementation](http://norvig.com/lispy2.html) for
+It's the simple scheme script, see [scheme
+submodule](https://github.com/mk-fg/notification-thing/blob/master/notification_thing/scheme.py)
+or [original Peter Norvig's implementation](http://norvig.com/lispy2.html) for
 details.
 
 It's evaluation should return the function which will be called for each
