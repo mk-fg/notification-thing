@@ -56,9 +56,9 @@ without any installation.
 
 * [Python 2.7 (not 3.X)](http://python.org/)
 * [dbus-python](http://www.freedesktop.org/wiki/Software/DBusBindings#dbus-python)
-* GTK+ 3.X and
-  [gobject-introspection](https://live.gnome.org/GObjectIntrospection/)-enabled
-  [pygobject](http://live.gnome.org/PyGObject)
+* [GObject-Introspection](https://live.gnome.org/GObjectIntrospection/)-enabled
+  [Gtk+](http://www.gtk.org/) 3.X (including Glib, Pango) and
+  [PyGObject](http://live.gnome.org/PyGObject)
 
 Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here -
 it's usually used to send the messages, not receive and display them.
