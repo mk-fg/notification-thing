@@ -39,7 +39,7 @@ class NotificationDaemon(dbus.service.Object):
 		self._note_id_pool = it.chain.from_iterable(
 			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
 		self._renderer = NotificationDisplay(
-			optz.layout_margin, optz.layout_anchor, optz.layout_direction )
+			optz.layout_margin, optz.layout_anchor, optz.layout_direction, optz.img_w, optz.img_h)
 		self._activity_event()
 
 
@@ -392,6 +392,10 @@ def main():
 	parser.add_argument('--tbf-dec', type=int, default=optz['tbf_dec'],
 		help='tbf_tick divider on successful grab from non-empty bucket,'
 			' wont lower multiplier below 1 (default: %(default)s)')
+	parser.add_argument('--img-w', type=int, default=optz["img_w"],
+		help='max image icon width')
+	parser.add_argument('--img-h', type=int, default=optz["img_h"],
+		help='max image icon height')
 
 	parser.add_argument('--debug', action='store_true', help='Enable debug logging to stderr.')
 
