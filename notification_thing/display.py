@@ -22,13 +22,15 @@ class NotificationDisplay(object):
 		Current implementation based on notipy: git://github.com/the-isz/notipy.git'''
 	window = namedtuple('Window', 'gobj event_boxes')
 
-	def __init__(self, layout_margin, layout_anchor, layout_direction):
+	def __init__(self, layout_margin, layout_anchor, layout_direction, img_w, img_h):
 		self.margins = dict(it.chain.from_iterable(map(
 			lambda ax: ( (2**ax, layout_margin),
 				(-2**ax, layout_margin) ), xrange(2) )))
 		self.layout_margin = layout_margin
 		self.layout_anchor = layout_anchor
 		self.layout_direction = layout_direction
+		self.img_w = img_w
+		self.img_h = img_h
 
 		self._windows = OrderedDict()
 
@@ -84,7 +86,12 @@ class NotificationDisplay(object):
 				if icon_path.startswith('file://'): icon_path = icon_path[7:]
 				if os.path.isfile(icon_path):
 					widget_icon = Gtk.Image()
-					widget_icon.set_from_file(icon_path)
+					if self.img_w != -1 or self.img_h != -1:
+						pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, self.img_w, self.img_h)
+						#scaled_buf = pixbuf.scale_simple(self.img_w, self.img_h, gtk.gdk.INTERP_BILINEAR)
+						widget_icon.set_from_pixbuf(pixbuf)
+					else:
+						widget_icon.set_from_file(icon_path)
 				else:
 					# available names: Gtk.IconTheme.get_default().list_icons(None)
 					theme = Gtk.IconTheme.get_default()
