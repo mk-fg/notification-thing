@@ -80,19 +80,20 @@ class NotificationDisplay(object):
 		frame = Gtk.Frame(shadow_type=Gtk.ShadowType.ETCHED_OUT)
 		win.add(frame)
 
-		widget_icon = widget_pixbuf = None
+		widget_icon = None
 		if icon is not None:
 			if isinstance(icon, unicode):
 				icon_path = os.path.expanduser(urllib.url2pathname(icon))
 				if icon_path.startswith('file://'): icon_path = icon_path[7:]
 				if os.path.isfile(icon_path):
-					widget_pixbuf = GdkPixbuf.Pixbuf.new_from_file(icon_path)
+					widget_icon = GdkPixbuf.Pixbuf.new_from_file(icon_path)
 				else:
-					# available names: Gtk.IconTheme.get_default().list_icons(None)
+					# Available names: Gtk.IconTheme.get_default().list_icons(None)
 					theme = Gtk.IconTheme.get_default()
 					if theme.has_icon(icon):
-						widget_icon = Gtk.Image()
-						widget_icon.set_from_icon_name(icon, Gtk.IconSize.DND) # XXX: why this IconSize?
+						icon_size = self.icon_width or self.icon_height or 32
+						widget_icon = theme.lookup_icon(
+							icon, icon_size, Gtk.IconLookupFlags.USE_BUILTIN ).load_icon()
 					else:
 						log.warn(( '"{}" seems to be neither a valid icon file nor'
 							' a name in a freedesktop.org-compliant icon theme (or your theme'
@@ -111,14 +112,13 @@ class NotificationDisplay(object):
 				# data, colorspace, has_alpha, bits_per_sample,
 				#  width, height, rowstride, destroy_fn, destroy_fn_data
 				# XXX: Do I need to free the image via a function callback?
-				widget_pixbuf = GdkPixbuf.Pixbuf.new_from_data(
+				widget_icon = GdkPixbuf.Pixbuf.new_from_data(
 					bytearray(icon[6]), GdkPixbuf.Colorspace.RGB, icon[3], icon[4],
 					icon[0], icon[1], icon[2], lambda x, y: None, None )
 
-		if not widget_icon and widget_pixbuf:
-			widget_icon = Gtk.Image()
+		if widget_icon:
 			if self.icon_width or self.icon_height: # scale icon
-				w, h = widget_pixbuf.get_width(), widget_pixbuf.get_height()
+				w, h = widget_icon.get_width(), widget_icon.get_height()
 				# Use max (among w/h) factor on scale-up and min on scale-down,
 				#  so resulting icon will always fit in a specified box,
 				#  and will match it by (at least) w or h (ideally - both)
@@ -127,9 +127,10 @@ class NotificationDisplay(object):
 				scale = (min if bool(scale) ^ bool(
 						self.icon_width and self.icon_height ) else max)\
 					(float(self.icon_width or w) / w, float(self.icon_height or h) / h)
-				widget_pixbuf = widget_pixbuf.scale_simple(
+				widget_icon = widget_icon.scale_simple(
 					w * scale, h * scale, GdkPixbuf.InterpType.BILINEAR )
-			widget_icon.set_from_pixbuf(widget_pixbuf)
+			widget_icon, pixbuf = Gtk.Image(), widget_icon
+			widget_icon.set_from_pixbuf(pixbuf)
 
 		v_box = Gtk.VBox(spacing=self.layout_margin, expand=False)
 		if widget_icon is not None:
