@@ -134,8 +134,9 @@ Lots of tunable options are available, but all-defaults should be the norm
 	                          [-q QUEUE_LEN]
 	                          [--layout-anchor {top_right,bottom_left,bottom_right,top_left}]
 	                          [--layout-direction {horizontal,vertical}]
-	                          [--layout-margin LAYOUT_MARGIN]
-	                          [--tbf-size TBF_SIZE] [--tbf-tick TBF_TICK]
+	                          [--layout-margin LAYOUT_MARGIN] [--icon-width px]
+	                          [--icon-height px] [--tbf-size TBF_SIZE]
+	                          [--tbf-tick TBF_TICK]
 	                          [--tbf-max-delay TBF_MAX_DELAY] [--tbf-inc TBF_INC]
 	                          [--tbf-dec TBF_DEC] [--debug]
 
@@ -172,6 +173,10 @@ Lots of tunable options are available, but all-defaults should be the norm
 	  --layout-margin LAYOUT_MARGIN
 	                        Margin between notifications, screen edges, and some
 	                        misc stuff (default: 3px).
+	  --icon-width px, --img-w px
+	                        Scale icon (preserving aspect ratio) to width.
+	  --icon-height px, --img-h px
+	                        Scale icon (preserving aspect ratio) to height.
 	  --tbf-size TBF_SIZE   Token-bucket message-flow filter (tbf) bucket size
 	                        (default: 4)
 	  --tbf-tick TBF_TICK   tbf update interval (new token), so token_inflow =
