@@ -1,4 +1,4 @@
-notification-thing: pygi (gtk3) notification daemon
+notification-thing: Gtk3 (PyGI) notification daemon
 --------------------
 
 There are quite a few of the [notification
@@ -8,8 +8,7 @@ others.
 
 Another thing is that simple implementation of the spec doesn't work for me - I
 need rate-limiting (but without silent dropping of any messages - it's much
-worse!) to maintain sanity while still paying any attention to these
-popups.
+worse!) to maintain sanity while still paying any attention to these popups.
 
 Flexible-enough filtering is another thing.
 
@@ -187,11 +186,19 @@ Lots of tunable options are available, but all-defaults should be the norm
 Use --debug option to get a verbose log of all that's happening there, which
 decisions are made and based on what data.
 
-DBus interface lacks proper introspection at the moment, but is extended with a
-few functions, more info on which can be found
-[here](http://blog.fraggod.net/2010/12/Further-improvements-on-notification-daemon)
-and [here](http://blog.fraggod.net/2011/8/Notification-daemon-in-python). For
-example, to temporarily block/unblock all but the urgent notifications:
+DBus interface can be inspected via usual introspection methods (add "--xml" to
+get more canonical form):
+
+	gdbus introspect --session\
+	  --dest org.freedesktop.Notifications\
+	  --object-path /org/freedesktop/Notifications
+
+It has two out-of-spec methods - "Set" and "Flush", more info on which can be
+found [here](http://blog.fraggod.net/2010/12/Further-improvements-on-notification-daemon)
+and [here](http://blog.fraggod.net/2011/8/Notification-daemon-in-python) or in
+the [code](https://github.com/mk-fg/notification-thing/blob/master/notification_thing/daemon.py).
+
+For example, to temporarily block/unblock all but the urgent notifications:
 
 	dbus-send --type=method_call\
 	  --dest=org.freedesktop.Notifications

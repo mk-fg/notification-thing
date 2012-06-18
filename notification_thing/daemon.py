@@ -67,7 +67,7 @@ class NotificationDaemon(dbus.service.Object):
 	@_dbus_method('', 'ssss')
 	def GetServerInformation(self):
 		self._activity_event()
-		return 'Notifications', 'freedesktop.org', '0.1', '0.7.1'
+		return 'notification-thing', 'mk.fraggod@gmail.com', 'git', '1.2'
 
 	@_dbus_method('', 'as')
 	def GetCapabilities(self):
