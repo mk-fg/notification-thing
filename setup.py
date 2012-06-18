@@ -35,7 +35,9 @@ setup(
 		'Programming Language :: Python :: 2 :: Only',
 		'Topic :: Desktop Environment' ],
 
-	dependency_links = ['https://live.gnome.org/PyGObject#Source'],
+	dependency_links = [
+		'https://live.gnome.org/PyGObject#Source',
+		'http://dbus.freedesktop.org/releases/dbus-python/' ],
 
 	packages = find_packages(),
 

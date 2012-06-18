@@ -29,18 +29,6 @@ I wrote a few extended notes on the subject over time
 mostly summarized above.
 
 
-Requirements
---------------------
-
-* [Python 2.7 (not 3.X)](http://python.org/)
-* GTK+ 3.X and
-  [gobject-introspection](https://live.gnome.org/GObjectIntrospection/)-enabled
-  [pygobject](http://live.gnome.org/PyGObject)
-
-Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here -
-it's usually used to send the messages, not receive and display them.
-
-
 Installation
 --------------------
 
@@ -63,6 +51,17 @@ necessary dependencies as well:
 
 Alternatively, `./notification-thing` can be run right from the checkout tree,
 without any installation.
+
+### Requirements
+
+* [Python 2.7 (not 3.X)](http://python.org/)
+* [dbus-python](http://www.freedesktop.org/wiki/Software/DBusBindings#dbus-python)
+* GTK+ 3.X and
+  [gobject-introspection](https://live.gnome.org/GObjectIntrospection/)-enabled
+  [pygobject](http://live.gnome.org/PyGObject)
+
+Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here -
+it's usually used to send the messages, not receive and display them.
 
 
 Usage
