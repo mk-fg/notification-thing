@@ -54,11 +54,12 @@ class NotificationDisplay(object):
 			Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION )
 
 	def _update_layout(self):
-		# Yep, I was SMOKING CRACK here, and it all made sense at the time
+		# Get the coordinates of the "anchor" corner (screen corner +/- margins)
 		base = tuple(map(
 			lambda ax, gdk_dim=('width', 'height'):\
 				(getattr(Gdk.Screen, gdk_dim[ax])() - self.margins[2**ax])\
 					if 2**ax & self.layout_anchor else self.margins[-2**ax], xrange(2) ))
+		# Iterate over windows in order, placing each one starting from a "base" corner
 		for win in map(op.attrgetter('gobj'), self._windows.viewvalues()):
 			win.move(*map(lambda ax: base[ax] - ( win.get_size()[ax]
 				if 2**ax & self.layout_anchor else 0 ), xrange(2)))
@@ -157,6 +158,12 @@ class NotificationDisplay(object):
 		v_box.pack_start(widget_body, False, False, 0)
 		ev_boxes.append(widget_body)
 
+		# Make sure the window is initially drawn off-screen, because it can't be
+		#  placed properly until it's size is known, and it's size is unknown until it's
+		#  actually handled by window manager and then drawn by X
+		# Proper placement is done on update_layout() call
+		win.move(-2000, -2000)
+
 		win.show_all()
 		return self.window(win, ev_boxes)
 
@@ -198,8 +205,12 @@ class NotificationDisplay(object):
 				win.event_boxes[0].connect( 'destroy',
 					lambda w,cb,nid: cb(nid), cb_dismiss, note.id )
 
+			# update_layout() *must* be delayed until window "configure-event", because
+			#  actual window size is unknown until it's resized by window manager and drawn by X
+			# See the list of caveats here:
+			#  http://developer.gnome.org/gtk3/unstable/GtkWindow.html#gtk-window-get-size
+			win.gobj.connect('configure-event', lambda w,void: self._update_layout())
 			self._windows[note.id] = win
-			self._update_layout()
 
 		except: log.exception('Failed to create notification window')
 
