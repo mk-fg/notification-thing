@@ -424,7 +424,7 @@ def main():
 
 	import logging
 	logging.basicConfig(level=logging.DEBUG if optz.debug else logging.WARNING)
-	log = logging.getLogger()
+	log = logging.getLogger(__name__)
 
 	daemon = NotificationDaemon( bus,
 		core.dbus_path, dbus.service.BusName(core.dbus_id, bus) )

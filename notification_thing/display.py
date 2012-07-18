@@ -12,7 +12,7 @@ from gi.repository import Gtk, Gdk, GdkPixbuf, Pango
 from .core import urgency_levels
 
 import logging
-log = logging.getLogger()
+log = logging.getLogger(__name__)
 
 
 class NotificationDisplay(object):
