@@ -12,8 +12,18 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import GObject, Gdk
 
-from notification_thing import core
-from notification_thing.display import NotificationDisplay
+
+if __name__ == '__main__':
+	# Try to import submodules from the same path, not the site-packages
+	from os.path import join, realpath, dirname
+	module_root = realpath(dirname(dirname(__file__)))
+	if module_root not in sys.path: sys.path.insert(0, module_root)
+	from notification_thing.display import NotificationDisplay
+	from notification_thing import core
+
+else:
+	from .display import NotificationDisplay
+	from . import core
 
 
 DBusGMainLoop(set_as_default=True)
