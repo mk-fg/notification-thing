@@ -207,7 +207,7 @@ For example, to temporarily block/unblock all but the urgent notifications:
 	  dict:string:boolean:plug_toggle,true
 
 Appearance (and some behavior) of the popup windows is subject to [gtk3
-styles](http://developer.gnome.org/gtk3/3.1/GtkCssProvider.html) (simple css
+styles](http://developer.gnome.org/gtk3/unstable/GtkCssProvider.html) (simple css
 files), with default being the light one (see the actual code for up-to-date
 stylesheet though):
 
