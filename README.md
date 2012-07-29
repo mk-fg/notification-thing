@@ -46,7 +46,7 @@ installs into custom paths.
 Better way would be to use [pip](http://pip-installer.org/) to install all the
 necessary dependencies as well:
 
-	% pip install -e 'git://github.com/mk-fg/notification-thing.git#egg=notification-thing'
+	% pip install 'git+https://github.com/mk-fg/notification-thing.git#egg=notification-thing'
 
 Alternatively, `./notification-thing` can be run right from the checkout tree,
 without any installation.
