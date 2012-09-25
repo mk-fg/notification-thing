@@ -70,18 +70,9 @@ class NotificationDisplay(object):
 					base[ax] + (margin + win.get_size()[ax])\
 						* (2 * (2**ax ^ (2**ax & self.layout_anchor)) / 2**ax - 1), xrange(2) ))
 
-	def _create_win(self, summary, body, icon=None, urgency_label=None):
-		log.debug( 'Creating window with parameters: {}'\
-			.format(', '.join(map(unicode, [summary, body, icon, urgency_label]))) )
-
-		win = Gtk.Window(name='notification', type=Gtk.WindowType.POPUP)
-		win.set_default_size(400, 20)
-		ev_boxes = [win]
-
-		frame = Gtk.Frame(shadow_type=Gtk.ShadowType.ETCHED_OUT)
-		win.add(frame)
-
+	def _get_icon(self, icon):
 		widget_icon = None
+
 		if icon is not None:
 			if isinstance(icon, unicode):
 				icon_path = os.path.expanduser(urllib.url2pathname(icon))
@@ -100,19 +91,6 @@ class NotificationDisplay(object):
 							' a name in a freedesktop.org-compliant icon theme (or your theme'
 							' doesnt have that name). Ignoring.' ).format(icon))
 			else:
-				# For image-data and icon_data, image should look like this:
-				# dbus.Struct(
-				#  (dbus.Int32, # width
-				#   dbus.Int32, # height
-				#   dbus.Int32, # rowstride
-				#   dbus.Boolean, # has alpha
-				#   dbus.Int32, # bits per sample
-				#   dbus.Int32, # channels
-				#   dbus.Array([dbus.Byte, ...])) # image data
-				# )
-				# data, colorspace, has_alpha, bits_per_sample,
-				#  width, height, rowstride, destroy_fn, destroy_fn_data
-				# XXX: Do I need to free the image via a function callback?
 				widget_icon = GdkPixbuf.Pixbuf.new_from_data(
 					bytearray(icon[6]), GdkPixbuf.Colorspace.RGB, icon[3], icon[4],
 					icon[0], icon[1], icon[2], lambda x, y: None, None )
@@ -132,6 +110,24 @@ class NotificationDisplay(object):
 					w * scale, h * scale, GdkPixbuf.InterpType.BILINEAR )
 			widget_icon, pixbuf = Gtk.Image(), widget_icon
 			widget_icon.set_from_pixbuf(pixbuf)
+
+		return widget_icon
+
+	def _create_win(self, summary, body, icon=None, urgency_label=None):
+		log.debug( 'Creating window with parameters: {}'\
+			.format(', '.join(map(unicode, [summary, body, icon, urgency_label]))) )
+
+		win = Gtk.Window(name='notification', type=Gtk.WindowType.POPUP)
+		win.set_default_size(400, 20)
+		ev_boxes = [win]
+
+		frame = Gtk.Frame(shadow_type=Gtk.ShadowType.ETCHED_OUT)
+		win.add(frame)
+
+		try: widget_icon = self._get_icon(icon)
+		except Exception: # Gdk may raise errors for some images/formats
+			log.exception('Failed to set notification icon')
+			widget_icon = None
 
 		v_box = Gtk.VBox(spacing=self.layout_margin, expand=False)
 		if widget_icon is not None:
