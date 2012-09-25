@@ -319,7 +319,7 @@ class NotificationDaemon(dbus.service.Object):
 		if nid:
 			note = self._note_windows.get(nid, None)
 			if note:
-				if getattr(note, 'timer_id', None): GObject.source_remove(note.timer_id)
+				if note.get('timer_id'): GObject.source_remove(note.timer_id)
 
 				if delay is None: del self._note_windows[nid]
 				elif 'timer_id' in note: # these get sent very often
