@@ -115,7 +115,7 @@ class NotificationDisplay(object):
 
 	def _create_win(self, summary, body, icon=None, urgency_label=None):
 		log.debug( 'Creating window with parameters: {}'\
-			.format(', '.join(map(unicode, [summary, body, icon, urgency_label]))) )
+			.format(', '.join(map(unicode, [summary, repr(body), icon, urgency_label]))) )
 
 		win = Gtk.Window(name='notification', type=Gtk.WindowType.POPUP)
 		win.set_default_size(400, 20)
