@@ -204,6 +204,7 @@ class NotificationDaemon(dbus.service.Object):
 	def _fullscreen_check(self, jitter=5):
 		screen = Gdk.Screen.get_default()
 		win = screen.get_active_window()
+		if not win: return False
 		win_state = win.get_state()
 		x,y,w,h = win.get_geometry()
 		return win_state & win_state.FULLSCREEN\
