@@ -10,7 +10,12 @@ import os, sys, traceback
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import GObject, Gdk
+from gi.repository import GObject
+
+try: from gi.repository import Gdk
+except RuntimeError as err: # less verbose errors in case X isn't running
+	print('Gdk init error, exiting: {}'.format(err.message), file=sys.stderr)
+	sys.exit(1)
 
 
 if __name__ == '__main__':
