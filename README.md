@@ -27,6 +27,12 @@ I wrote a few extended notes on the subject over time
 [link3](http://blog.fraggod.net/2011/8/Notification-daemon-in-python)), but it's
 mostly summarized above.
 
+How it looks (with built-in css, see below on how to override):
+![displayed notifications
+shot](https://freecode.com/screenshots/99/a6/99a6235e6a09da8de7316684be59bccf_medium.png
+"A few notifications with a compositing wm (e17). Headers are colored (by
+default) by priority.")
+
 
 Installation
 --------------------
