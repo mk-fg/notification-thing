@@ -46,7 +46,7 @@ class NotificationDisplay(object):
 
 			#notification #summary {
 				font-size: 10;
-				text-shadow: 1 1 0 gray;
+				text-shadow: 1px 1px 0 gray;
 			}
 			#notification #body { font-size: 8; }''' )
 		Gtk.StyleContext.add_provider_for_screen(
