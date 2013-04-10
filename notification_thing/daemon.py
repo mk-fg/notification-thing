@@ -38,321 +38,337 @@ optz, poll_interval, close_reasons, urgency_levels =\
 	core.optz, core.poll_interval, core.close_reasons, core.urgency_levels
 
 
-def notification_daemon_factory(*dbus_svc_argz, **dbus_svc_kwz):
-	'Build NotificationDaemon class on a configured dbus interface.'
 
-	_dbus_method = ft.partial(dbus.service.method, optz.dbus_interface)
-	_dbus_signal = ft.partial(dbus.service.signal, optz.dbus_interface)
+class NotificationMethods(object):
+	plugged, timeout_cleanup = False, True
+	_activity_timer = None
 
-	class NotificationDaemon(dbus.service.Object):
-		plugged, timeout_cleanup = False, True
-		_activity_timer = None
-
-		def __init__(self, *dbus_svc_argz, **dbus_svc_kwz):
-			super(NotificationDaemon, self).__init__(*dbus_svc_argz, **dbus_svc_kwz)
-			tick_strangle_max = op.truediv(optz.tbf_max_delay, optz.tbf_tick)
-			self._note_limit = core.FC_TokenBucket(
-				tick=optz.tbf_tick, burst=optz.tbf_size,
-				tick_strangle=lambda x: min(x*optz.tbf_inc, tick_strangle_max),
-				tick_free=lambda x: max(op.truediv(x, optz.tbf_dec), 1) )
-			self._note_buffer = core.RRQ(optz.queue_len)
-			self._note_windows = dict()
-			self._note_id_pool = it.chain.from_iterable(
-				it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
-			self._renderer = NotificationDisplay(
-				optz.layout_margin, optz.layout_anchor,
-				optz.layout_direction, optz.icon_width, optz.icon_height )
-			self._activity_event()
+	def __init__(self):
+		tick_strangle_max = op.truediv(optz.tbf_max_delay, optz.tbf_tick)
+		self._note_limit = core.FC_TokenBucket(
+			tick=optz.tbf_tick, burst=optz.tbf_size,
+			tick_strangle=lambda x: min(x*optz.tbf_inc, tick_strangle_max),
+			tick_free=lambda x: max(op.truediv(x, optz.tbf_dec), 1) )
+		self._note_buffer = core.RRQ(optz.queue_len)
+		self._note_windows = dict()
+		self._note_id_pool = it.chain.from_iterable(
+			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
+		self._renderer = NotificationDisplay(
+			optz.layout_margin, optz.layout_anchor,
+			optz.layout_direction, optz.icon_width, optz.icon_height )
+		self._activity_event()
 
 
-		def exit(self, reason=None):
-			log.debug('Exiting cleanly{}'.format(', reason: {}'.format(reason) if reason else ''))
-			sys.exit()
+	def exit(self, reason=None):
+		log.debug('Exiting cleanly{}'.format(', reason: {}'.format(reason) if reason else ''))
+		sys.exit()
 
-		def _activity_event(self, callback=False):
-			if callback:
-				if not self._note_windows:
-					self.exit(reason='activity timeout ({}s)'.format(optz.activity_timeout))
-				else:
-					log.debug( 'Ignoring inacivity timeout event'
-						' due to existing windows (retry in {}s).'.format(optz.activity_timeout) )
-					self._activity_timer = None
-			if self._activity_timer: GObject.source_remove(self._activity_timer)
-			self._activity_timer = GObject.timeout_add_seconds(
-				optz.activity_timeout, self._activity_event, True )
-
-
-		@_dbus_method('', 'ssss')
-		def GetServerInformation(self):
-			self._activity_event()
-			return 'notification-thing', 'mk.fraggod@gmail.com', 'git', '1.2'
-
-		@_dbus_method('', 'as')
-		def GetCapabilities(self):
-			# action-icons, actions, body, body-hyperlinks, body-images,
-			#  body-markup, icon-multi, icon-static, persistence, sound
-			self._activity_event()
-			return ['body', 'persistence', 'icon-static']
-
-		@_dbus_signal('uu')
-		def NotificationClosed(self, nid, reason):
-			log.debug(
-				'NotificationClosed signal (id: {}, reason: {})'\
-				.format(nid, close_reasons.by_id(reason)) )
-
-		@_dbus_signal('us')
-		def ActionInvoked(self, nid, action_key):
-			log.debug('Um... some action invoked? Params: {}'.format([nid, action_key]))
-
-
-		@_dbus_method('', '')
-		def Flush(self):
-			log.debug('Manual flush of the notification buffer')
-			self._activity_event()
-			return self.flush(force=True)
-
-		@_dbus_method('a{sb}', '')
-		def Set(self, params):
-			self._activity_event()
-			# Urgent-passthrough controls
-			if params.pop('urgent_toggle', None): params['urgent'] = not optz.urgency_check
-			try: val = params.pop('urgent')
-			except KeyError: pass
+	def _activity_event(self, callback=False):
+		if callback:
+			if not self._note_windows:
+				self.exit(reason='activity timeout ({}s)'.format(optz.activity_timeout))
 			else:
-				optz.urgency_check = val
+				log.debug( 'Ignoring inacivity timeout event'
+					' due to existing windows (retry in {}s).'.format(optz.activity_timeout) )
+				self._activity_timer = None
+		if self._activity_timer: GObject.source_remove(self._activity_timer)
+		self._activity_timer = GObject.timeout_add_seconds(
+			optz.activity_timeout, self._activity_event, True )
+
+
+	def GetServerInformation(self):
+		self._activity_event()
+		return 'notification-thing', 'mk.fraggod@gmail.com', 'git', '1.2'
+
+	def GetCapabilities(self):
+		# action-icons, actions, body, body-hyperlinks, body-images,
+		#  body-markup, icon-multi, icon-static, persistence, sound
+		self._activity_event()
+		return ['body', 'persistence', 'icon-static']
+
+	def NotificationClosed(self, nid, reason=None):
+		log.debug(
+			'NotificationClosed signal (id: {}, reason: {})'\
+			.format(nid, close_reasons.by_id(reason)) )
+
+	def ActionInvoked(self, nid, action_key):
+		log.debug('Um... some action invoked? Params: {}'.format([nid, action_key]))
+
+
+	def Flush(self):
+		log.debug('Manual flush of the notification buffer')
+		self._activity_event()
+		return self.flush(force=True)
+
+	def Set(self, params):
+		self._activity_event()
+		# Urgent-passthrough controls
+		if params.pop('urgent_toggle', None): params['urgent'] = not optz.urgency_check
+		try: val = params.pop('urgent')
+		except KeyError: pass
+		else:
+			optz.urgency_check = val
+			if optz.status_notify:
+				self.display(
+					'Urgent messages passthrough {}'.format(
+						'enabled' if optz.urgency_check else 'disabled' ) )
+		# Plug controls
+		if params.pop('plug_toggle', None): params['plug'] = not self.plugged
+		try: val = params.pop('plug')
+		except KeyError: pass
+		else:
+			if val:
+				self.plugged = True
+				log.debug('Notification queue plugged')
 				if optz.status_notify:
-					self.display(
-						'Urgent messages passthrough {}'.format(
-							'enabled' if optz.urgency_check else 'disabled' ) )
-			# Plug controls
-			if params.pop('plug_toggle', None): params['plug'] = not self.plugged
-			try: val = params.pop('plug')
-			except KeyError: pass
+					self.display( 'Notification proxy: queue is plugged',
+						'Only urgent messages will be passed through'
+							if optz.urgency_check else 'All messages will be stalled' )
 			else:
-				if val:
-					self.plugged = True
-					log.debug('Notification queue plugged')
+				self.plugged = False
+				log.debug('Notification queue unplugged')
+				if optz.status_notify:
+					self.display('Notification proxy: queue is unplugged')
+				if self._note_buffer:
+					log.debug('Flushing plugged queue')
+					self.flush()
+		# Timeout override
+		if params.pop('cleanup_toggle', None): params['cleanup'] = not self.timeout_cleanup
+		try: val = params.pop('cleanup')
+		except KeyError: pass
+		else:
+			self.timeout_cleanup = val
+			log.debug('Cleanup timeout: {}'.format(self.timeout_cleanup))
+			if optz.status_notify:
+				self.display( 'Notification proxy: cleanup timeout is {}'\
+					.format('enabled' if self.timeout_cleanup else 'disabled') )
+		# Notify about malformed arguments, if any
+		if params and optz.status_notify:
+			self.display('Notification proxy: unrecognized parameters', repr(params))
+
+	def Notify(self, app_name, nid, icon, summary, body, actions, hints, timeout):
+		self._activity_event()
+		note = core.Notification.from_dbus(
+			app_name, nid, icon, summary, body, actions, hints, timeout )
+		if nid: self.close(nid, reason=close_reasons.closed)
+		try: return self.filter(note)
+		except Exception:
+			log.exception('Unhandled error')
+			return 0
+
+	def CloseNotification(self, nid):
+		log.debug('CloseNotification call (id: {})'.format(nid))
+		self._activity_event()
+		self.close(nid, reason=close_reasons.closed)
+
+
+	_filter_ts_chk = 0
+	_filter_callback = None, 0
+
+	def _notification_check(self, summary, body):
+		(cb, mtime), ts = self._filter_callback, time()
+		if self._filter_ts_chk < ts - poll_interval:
+			self._filter_ts_chk = ts
+			try: ts = int(os.stat(optz.filter_file).st_mtime)
+			except (OSError, IOError): return True
+			if ts > mtime:
+				mtime = ts
+				try: cb = core.get_filter(optz.filter_file)
+				except:
+					ex, self._filter_callback = traceback.format_exc(), (None, 0)
+					log.debug( 'Failed to load'
+						' notification filters (from {}):\n{}'.format(optz.filter_file, ex) )
 					if optz.status_notify:
-						self.display( 'Notification proxy: queue is plugged',
-							'Only urgent messages will be passed through'
-								if optz.urgency_check else 'All messages will be stalled' )
+						self.display('Notification proxy: failed to load notification filters', ex)
+					return True
 				else:
-					self.plugged = False
-					log.debug('Notification queue unplugged')
-					if optz.status_notify:
-						self.display('Notification proxy: queue is unplugged')
-					if self._note_buffer:
-						log.debug('Flushing plugged queue')
-						self.flush()
-			# Timeout override
-			if params.pop('cleanup_toggle', None): params['cleanup'] = not self.timeout_cleanup
-			try: val = params.pop('cleanup')
-			except KeyError: pass
-			else:
-				self.timeout_cleanup = val
-				log.debug('Cleanup timeout: {}'.format(self.timeout_cleanup))
-				if optz.status_notify:
-					self.display( 'Notification proxy: cleanup timeout is {}'\
-						.format('enabled' if self.timeout_cleanup else 'disabled') )
-			# Notify about malformed arguments, if any
-			if params and optz.status_notify:
-				self.display('Notification proxy: unrecognized parameters', repr(params))
+					log.debug('(Re)Loaded notification filters')
+					self._filter_callback = cb, mtime
+		if cb is None: return True # no filtering defined
+		elif not callable(cb): return bool(cb)
+		try: return cb(summary, body)
+		except:
+			ex = traceback.format_exc()
+			log.debug('Failed to execute notification filters:\n{}'.format(ex))
+			if optz.status_notify:
+				self.display('Notification proxy: notification filters failed', ex)
+			return True
 
-		@_dbus_method('susssasa{sv}i', 'u')
-		def Notify(self, app_name, nid, icon, summary, body, actions, hints, timeout):
-			self._activity_event()
-			note = core.Notification.from_dbus(
-				app_name, nid, icon, summary, body, actions, hints, timeout )
-			if nid: self.close(nid, reason=close_reasons.closed)
-			try: return self.filter(note)
-			except Exception:
-				log.exception('Unhandled error')
-				return 0
+	@property
+	def _fullscreen_check(self, jitter=5):
+		screen = Gdk.Screen.get_default()
+		win = screen.get_active_window()
+		if not win: return False
+		win_state = win.get_state()
+		x,y,w,h = win.get_geometry()
+		return win_state & win_state.FULLSCREEN\
+			or ( x <= jitter and y <= jitter
+				and w >= screen.get_width() - jitter
+				and h >= screen.get_height() - jitter )
 
-		@_dbus_method('u', '')
-		def CloseNotification(self, nid):
-			log.debug('CloseNotification call (id: {})'.format(nid))
-			self._activity_event()
-			self.close(nid, reason=close_reasons.closed)
+	def filter(self, note):
+		# TODO: also, just update timeout if content is the same as one of the displayed
+		try: urgency = int(note.hints['urgency'])
+		except KeyError: urgency = None
 
+		plug = self.plugged or (optz.fs_check and self._fullscreen_check)
+		urgent = optz.urgency_check and urgency == core.urgency_levels.critical
 
-		_filter_ts_chk = 0
-		_filter_callback = None, 0
-
-		def _notification_check(self, summary, body):
-			(cb, mtime), ts = self._filter_callback, time()
-			if self._filter_ts_chk < ts - poll_interval:
-				self._filter_ts_chk = ts
-				try: ts = int(os.stat(optz.filter_file).st_mtime)
-				except (OSError, IOError): return True
-				if ts > mtime:
-					mtime = ts
-					try: cb = core.get_filter(optz.filter_file)
-					except:
-						ex, self._filter_callback = traceback.format_exc(), (None, 0)
-						log.debug( 'Failed to load'
-							' notification filters (from {}):\n{}'.format(optz.filter_file, ex) )
-						if optz.status_notify:
-							self.display('Notification proxy: failed to load notification filters', ex)
-						return True
-					else:
-						log.debug('(Re)Loaded notification filters')
-						self._filter_callback = cb, mtime
-			if cb is None: return True # no filtering defined
-			elif not callable(cb): return bool(cb)
-			try: return cb(summary, body)
-			except:
-				ex = traceback.format_exc()
-				log.debug('Failed to execute notification filters:\n{}'.format(ex))
-				if optz.status_notify:
-					self.display('Notification proxy: notification filters failed', ex)
-				return True
-
-		@property
-		def _fullscreen_check(self, jitter=5):
-			screen = Gdk.Screen.get_default()
-			win = screen.get_active_window()
-			if not win: return False
-			win_state = win.get_state()
-			x,y,w,h = win.get_geometry()
-			return win_state & win_state.FULLSCREEN\
-				or ( x <= jitter and y <= jitter
-					and w >= screen.get_width() - jitter
-					and h >= screen.get_height() - jitter )
-
-		def filter(self, note):
-			# TODO: also, just update timeout if content is the same as one of the displayed
-			try: urgency = int(note.hints['urgency'])
-			except KeyError: urgency = None
-
-			plug = self.plugged or (optz.fs_check and self._fullscreen_check)
-			urgent = optz.urgency_check and urgency == core.urgency_levels.critical
-
-			if urgent: # special case - no buffer checks
-				self._note_limit.consume()
-				log.debug( 'Urgent message immediate passthru'
-					', tokens left: {}'.format(self._note_limit.tokens) )
-				return self.display(note)
-
-			if not self._notification_check(note.summary, note.body):
-				log.debug('Dropped notification due to negative filtering result')
-				return 0
-
-			if plug or not self._note_limit.consume():
-				# Delay notification
-				to = self._note_limit.get_eta() if not plug else poll_interval
-				if to > 1: # no need to bother otherwise, note that it'll be an extra token ;)
-					self._note_buffer.append(note)
-					to = to + 1 # +1 is to ensure token arrival by that time
-					log.debug( 'Queueing notification. Reason: {}. Flush attempt in {}s'\
-						.format('plug or fullscreen window detected' if plug else 'notification rate limit', to) )
-					self.flush(timeout=to)
-					return 0
-
-			if self._note_buffer:
-				self._note_buffer.append(note)
-				log.debug('Token-flush of notification buffer')
-				self.flush()
-				return 0
-			else:
-				log.debug('Token-pass, {} token(s) left'.format(self._note_limit.tokens))
-				return self.display(note)
-
-
-		_flush_timer = _flush_id = None
-
-		def flush(self, force=False, timeout=None):
-			if self._flush_timer:
-				GObject.source_remove(self._flush_timer)
-				self._flush_timer = None
-			if timeout:
-				log.debug('Scheduled notification buffer flush in {}s'.format(timeout))
-				self._flush_timer = GObject.timeout_add(int(timeout * 1000), self.flush)
-				return
-			if not self._note_buffer:
-				log.debug('Flush event with empty notification buffer')
-				return
-
-			log.debug( 'Flushing notification buffer ({} msgs, {} dropped)'\
-				.format(len(self._note_buffer), self._note_buffer.dropped) )
-
+		if urgent: # special case - no buffer checks
 			self._note_limit.consume()
-			if not force:
-				if optz.fs_check and (self.plugged or self._fullscreen_check):
-					log.debug( '{} detected, delaying buffer flush by {}s'\
-						.format(( 'Fullscreen window'
-							if not self.plugged else 'Plug' ), poll_interval) )
-					self.flush(timeout=poll_interval)
+			log.debug( 'Urgent message immediate passthru'
+				', tokens left: {}'.format(self._note_limit.tokens) )
+			return self.display(note)
+
+		if not self._notification_check(note.summary, note.body):
+			log.debug('Dropped notification due to negative filtering result')
+			return 0
+
+		if plug or not self._note_limit.consume():
+			# Delay notification
+			to = self._note_limit.get_eta() if not plug else poll_interval
+			if to > 1: # no need to bother otherwise, note that it'll be an extra token ;)
+				self._note_buffer.append(note)
+				to = to + 1 # +1 is to ensure token arrival by that time
+				log.debug( 'Queueing notification. Reason: {}. Flush attempt in {}s'\
+					.format('plug or fullscreen window detected' if plug else 'notification rate limit', to) )
+				self.flush(timeout=to)
+				return 0
+
+		if self._note_buffer:
+			self._note_buffer.append(note)
+			log.debug('Token-flush of notification buffer')
+			self.flush()
+			return 0
+		else:
+			log.debug('Token-pass, {} token(s) left'.format(self._note_limit.tokens))
+			return self.display(note)
+
+
+	_flush_timer = _flush_id = None
+
+	def flush(self, force=False, timeout=None):
+		if self._flush_timer:
+			GObject.source_remove(self._flush_timer)
+			self._flush_timer = None
+		if timeout:
+			log.debug('Scheduled notification buffer flush in {}s'.format(timeout))
+			self._flush_timer = GObject.timeout_add(int(timeout * 1000), self.flush)
+			return
+		if not self._note_buffer:
+			log.debug('Flush event with empty notification buffer')
+			return
+
+		log.debug( 'Flushing notification buffer ({} msgs, {} dropped)'\
+			.format(len(self._note_buffer), self._note_buffer.dropped) )
+
+		self._note_limit.consume()
+		if not force:
+			if optz.fs_check and (self.plugged or self._fullscreen_check):
+				log.debug( '{} detected, delaying buffer flush by {}s'\
+					.format(( 'Fullscreen window'
+						if not self.plugged else 'Plug' ), poll_interval) )
+				self.flush(timeout=poll_interval)
+				return
+
+		if self._note_buffer:
+			# Decided not to use replace_id here - several feeds are okay
+			self._flush_id = self.display( self._note_buffer[0]\
+				if len(self._note_buffer) == 1 else core.Notification(
+					'Feed' if not self._note_buffer.dropped
+						else 'Feed ({} dropped)'.format(self._note_buffer.dropped),
+					'\n\n'.join(it.starmap( '--- {}\n  {}'.format,
+						it.imap(op.itemgetter('summary', 'body'), self._note_buffer) )),
+					app_name='notification-feed', icon='FBReader' ) )
+			self._note_buffer.flush()
+			log.debug('Notification buffer flushed')
+
+
+	def display(self, note_or_summary, *argz, **kwz):
+		note = note_or_summary\
+			if isinstance(note_or_summary, core.Notification)\
+			else core.Notification(note_or_summary, *argz, **kwz)
+
+		if note.replaces_id in self._note_windows:
+			self.close(note.replaces_id, close_reasons.closed)
+			note.id = self._note_windows[note.replaces_id]
+		else: note.id = next(self._note_id_pool)
+		nid = note.id
+
+		self._renderer.display( note,
+			cb_hover=ft.partial(self.close, delay=True),
+			cb_leave=ft.partial(self.close, delay=False),
+			cb_dismiss=ft.partial(self.close, reason=close_reasons.dismissed) )
+		self._note_windows[nid] = note
+
+		if self.timeout_cleanup and note.timeout > 0:
+			note.timer_created, note.timer_left = time(), note.timeout / 1000.0
+			note.timer_id = GObject.timeout_add(
+				note.timeout, self.close, nid, close_reasons.expired )
+
+		log.debug( 'Created notification (id: {}, timeout: {} (ms))'\
+			.format(nid, self.timeout_cleanup and note.timeout) )
+		return nid
+
+	def close(self, nid=None, reason=close_reasons.undefined, delay=None):
+		if nid:
+			note = self._note_windows.get(nid, None)
+			if note:
+				if note.get('timer_id'): GObject.source_remove(note.timer_id)
+
+				if delay is None: del self._note_windows[nid]
+				elif 'timer_id' in note: # these get sent very often
+					if delay:
+						if note.timer_id:
+							note.timer_id, note.timer_left = None,\
+								note.timer_left - (time() - note.timer_created)
+					else:
+						note.timer_created = time()
+						note.timer_id = GObject.timeout_add(
+							int(max(note.timer_left, 1) * 1000),
+							self.close, nid, close_reasons.expired )
 					return
 
-			if self._note_buffer:
-				# Decided not to use replace_id here - several feeds are okay
-				self._flush_id = self.display( self._note_buffer[0]\
-					if len(self._note_buffer) == 1 else core.Notification(
-						'Feed' if not self._note_buffer.dropped
-							else 'Feed ({} dropped)'.format(self._note_buffer.dropped),
-						'\n\n'.join(it.starmap( '--- {}\n  {}'.format,
-							it.imap(op.itemgetter('summary', 'body'), self._note_buffer) )),
-						app_name='notification-feed', icon='FBReader' ) )
-				self._note_buffer.flush()
-				log.debug('Notification buffer flushed')
+			if delay is None: # try it, even if there's no note object
+				log.debug(
+					'Closing notification(s) (id: {}, reason: {})'\
+					.format(nid, close_reasons.by_id(reason)) )
+				try: self._renderer.close(nid)
+				except self._renderer.NoWindowError: pass # no such window
+				else: self.NotificationClosed(nid, reason)
+
+		else: # close all of them
+			for nid in self._note_windows.keys(): self.close(nid, reason)
 
 
-		def display(self, note_or_summary, *argz, **kwz):
-			note = note_or_summary\
-				if isinstance(note_or_summary, core.Notification)\
-				else core.Notification(note_or_summary, *argz, **kwz)
 
-			if note.replaces_id in self._note_windows:
-				self.close(note.replaces_id, close_reasons.closed)
-				note.id = self._note_windows[note.replaces_id]
-			else: note.id = next(self._note_id_pool)
-			nid = note.id
+def _add_dbus_decorators(cls_name, cls_parents, cls_attrs):
+	method, signal = dbus.service.method, dbus.service.signal
+	assert NotificationMethods in cls_parents
+	methods = vars(NotificationMethods)
+	for wrapper in [
+			(method, 'GetCapabilities', '', 'as'),
+			(method, 'GetServerInformation', '', 'ssss'),
+			(signal, 'NotificationClosed', 'uu'),
+			(signal, 'ActionInvoked', 'us'),
+			(method, 'Flush', '', ''),
+			(method, 'Set', 'a{sb}', ''),
+			(method, 'Notify', 'susssasa{sv}i', 'u'),
+			(method, 'CloseNotification', 'u', '') ]:
+		(wrapper, name), args = wrapper[:2], wrapper[2:]
+		cls_attrs[name] = wrapper(optz.dbus_interface, *args)(methods[name])
+	return type(cls_name, cls_parents, cls_attrs)
 
-			self._renderer.display( note,
-				cb_hover=ft.partial(self.close, delay=True),
-				cb_leave=ft.partial(self.close, delay=False),
-				cb_dismiss=ft.partial(self.close, reason=close_reasons.dismissed) )
-			self._note_windows[nid] = note
+def notification_daemon_factory(*dbus_svc_argz, **dbus_svc_kwz):
+	'Build NotificationDaemon class on a configured dbus interface.'
+	# Necessary because dbus interface is embedded into method decorators,
+	#  so it's either monkey-patching of a global class or customized creation.
 
-			if self.timeout_cleanup and note.timeout > 0:
-				note.timer_created, note.timer_left = time(), note.timeout / 1000.0
-				note.timer_id = GObject.timeout_add(
-					note.timeout, self.close, nid, close_reasons.expired )
-
-			log.debug( 'Created notification (id: {}, timeout: {} (ms))'\
-				.format(nid, self.timeout_cleanup and note.timeout) )
-			return nid
-
-		def close(self, nid=None, reason=close_reasons.undefined, delay=None):
-			if nid:
-				note = self._note_windows.get(nid, None)
-				if note:
-					if note.get('timer_id'): GObject.source_remove(note.timer_id)
-
-					if delay is None: del self._note_windows[nid]
-					elif 'timer_id' in note: # these get sent very often
-						if delay:
-							if note.timer_id:
-								note.timer_id, note.timer_left = None,\
-									note.timer_left - (time() - note.timer_created)
-						else:
-							note.timer_created = time()
-							note.timer_id = GObject.timeout_add(
-								int(max(note.timer_left, 1) * 1000),
-								self.close, nid, close_reasons.expired )
-						return
-
-				if delay is None: # try it, even if there's no note object
-					log.debug(
-						'Closing notification(s) (id: {}, reason: {})'\
-						.format(nid, close_reasons.by_id(reason)) )
-					try: self._renderer.close(nid)
-					except self._renderer.NoWindowError: pass # no such window
-					else: self.NotificationClosed(nid, reason)
-
-			else: # close all of them
-				for nid in self._note_windows.keys(): self.close(nid, reason)
+	class NotificationDaemon(NotificationMethods, dbus.service.Object):
+		__metaclass__ = _add_dbus_decorators
+		def __init__(self, *dbus_svc_argz, **dbus_svc_kwz):
+			NotificationMethods.__init__(self)
+			dbus.service.Object.__init__(self, *dbus_svc_argz, **dbus_svc_kwz)
 
 	return NotificationDaemon(*dbus_svc_argz, **dbus_svc_kwz)
 
