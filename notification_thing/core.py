@@ -27,11 +27,9 @@ class Enum(dict):
 ####
 
 optz = dict( activity_timeout=10*60, popup_timeout=5, queue_len=10,
-	tbf_size=4, tbf_tick=15, tbf_max_delay=60, tbf_inc=2, tbf_dec=2 )
+	tbf_size=4, tbf_tick=15, tbf_max_delay=60, tbf_inc=2, tbf_dec=2,
+	dbus_interface='org.freedesktop.Notifications', dbus_path='/org/freedesktop/Notifications' )
 poll_interval = 60
-
-dbus_id = 'org.freedesktop.Notifications'
-dbus_path = '/org/freedesktop/Notifications'
 
 urgency_levels = Enum('low', 'normal', 'critical')
 close_reasons = Enum('expired', 'dismissed', 'closed', 'undefined', vals=range(1, 5))
