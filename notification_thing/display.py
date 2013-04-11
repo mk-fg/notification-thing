@@ -23,20 +23,20 @@ class NotificationDisplay(object):
 
 	window = namedtuple('Window', 'gobj event_boxes')
 	base_css = b'''
-			#notification { background-color: white; }
-			#notification #hs { background-color: black; }
+		#notification { background-color: white; }
+		#notification #hs { background-color: black; }
 
-			#notification #critical { background-color: #ffaeae; }
-			#notification #normal { background-color: #f0ffec; }
-			#notification #low { background-color: #bee3c6; }
+		#notification #critical { background-color: #ffaeae; }
+		#notification #normal { background-color: #f0ffec; }
+		#notification #low { background-color: #bee3c6; }
 
-			#notification #summary {
-				padding-left: 5px;
-				font-size: 10;
-				text-shadow: 1px 1px 0px gray;
-			}
-			#notification #body { font-size: 8; }'''
-	base_css_min = b'#notification #body { font-size: 8; }' # simpliest fallback
+		#notification #summary {
+			padding-left: 5px;
+			font-size: 10;
+			text-shadow: 1px 1px 0px gray;
+		}
+		#notification #body { font-size: 8; }'''
+	base_css_min = b'#notification * { font-size: 8; }' # simpliest fallback
 
 	def __init__( self, layout_margin,
 			layout_anchor, layout_direction, icon_width, icon_height ):
