@@ -3,11 +3,11 @@ from __future__ import unicode_literals, print_function
 
 import itertools as it, operator as op, functools as ft
 from collections import OrderedDict, namedtuple
-import os, urllib
+import os, urllib, re
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, GdkPixbuf, Pango
+from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Pango
 
 from .core import urgency_levels
 
@@ -20,7 +20,23 @@ class NotificationDisplay(object):
 		Should have "display(note, cb_dismiss=None) -> nid(UInt32, >0)", "close(nid)"
 			methods and NoWindowError(nid) exception, raised on erroneous nid's in close().
 		Current implementation based on notipy: git://github.com/the-isz/notipy.git'''
+
 	window = namedtuple('Window', 'gobj event_boxes')
+	base_css = b'''
+			#notification { background-color: white; }
+			#notification #hs { background-color: black; }
+
+			#notification #critical { background-color: #ffaeae; }
+			#notification #normal { background-color: #f0ffec; }
+			#notification #low { background-color: #bee3c6; }
+
+			#notification #summary {
+				padding-left: 5px;
+				font-size: 10;
+				text-shadow: 1px 1px 0px gray;
+			}
+			#notification #body { font-size: 8; }'''
+	base_css_min = b'#notification #body { font-size: 8; }' # simpliest fallback
 
 	def __init__( self, layout_margin,
 			layout_anchor, layout_direction, icon_width, icon_height ):
@@ -35,23 +51,25 @@ class NotificationDisplay(object):
 
 		self._windows = OrderedDict()
 
-		self._default_style = Gtk.CssProvider()
-		self._default_style.load_from_data( b'''
-			#notification { background-color: white; }
-			#notification #hs { background-color: black; }
-
-			#notification #critical { background-color: #ffaeae; }
-			#notification #normal { background-color: #f0ffec; }
-			#notification #low { background-color: #bee3c6; }
-
-			#notification #summary {
-				font-size: 10;
-				text-shadow: 1px 1px 0 gray;
-			}
-			#notification #body { font-size: 8; }''' )
+		self._default_style = self._get_default_css()
 		Gtk.StyleContext.add_provider_for_screen(
 			Gdk.Screen.get_default(), self._default_style,
 			Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION )
+
+	def _get_default_css(self):
+		css, base_css = Gtk.CssProvider(), self.base_css
+		for attempt in xrange(4):
+			try: css.load_from_data(base_css)
+			except GLib.GError as err:
+				log.warn('Failed to load default CSS style: {}'.format(err))
+			else: break
+			if attempt == 0:
+				# Try to work around https://bugzilla.gnome.org/show_bug.cgi?id=678876
+				base_css = re.sub(b'text-shadow: [^;]+;', b'text-shadow: 1 1 0 gray;', base_css)
+			elif attempt == 1: base_css = re.sub(b'text-shadow: [^;]+;', b'', base_css)
+			elif attempt == 2: base_css = self.base_css_min # last resort before no-css-at-all
+			else: break
+		return css
 
 	def _update_layout(self):
 		# Get the coordinates of the "anchor" corner (screen corner +/- margins)
