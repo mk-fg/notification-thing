@@ -123,71 +123,9 @@ or not. Example:
 ~/.notification_filter is reloaded on-the-fly if updated, any errors there will
 yield backtraces in notification windows.
 
-Lots of tunable options are available, but all-defaults should be the norm
-(naturally I use the defaults myself, because I'm the one who sets them;).
-
-	% notification-thing -h
-	usage: notification-thing [-h] [-f] [-u] [-c ACTIVITY_TIMEOUT]
-	                          [--no-status-notify] [--filter-file PATH]
-	                          [--filter-test SUMMARY BODY] [-t POPUP_TIMEOUT]
-	                          [-q QUEUE_LEN]
-	                          [--layout-anchor {top_right,bottom_left,bottom_right,top_left}]
-	                          [--layout-direction {horizontal,vertical}]
-	                          [--layout-margin LAYOUT_MARGIN] [--icon-width px]
-	                          [--icon-height px] [--tbf-size TBF_SIZE]
-	                          [--tbf-tick TBF_TICK]
-	                          [--tbf-max-delay TBF_MAX_DELAY] [--tbf-inc TBF_INC]
-	                          [--tbf-dec TBF_DEC] [--debug]
-
-	Desktop notification server.
-
-	optional arguments:
-	  -h, --help            show this help message and exit
-	  -f, --no-fs-check     Dont queue messages if active window is fullscreen
-	  -u, --no-urgency-check
-	                        Queue messages even if urgency is critical
-	  -c ACTIVITY_TIMEOUT, --activity-timeout ACTIVITY_TIMEOUT
-	                        No-activity (dbus calls) timeout before closing the
-	                        daemon instance (less or equal zero - infinite,
-	                        default: 600s)
-	  --no-status-notify    Do not send notification on changes in proxy settings.
-	  --filter-file PATH    Read simple scheme rules for filtering notifications
-	                        from file (default: ~/.notification_filter).
-	  --filter-test SUMMARY BODY
-	                        Do not start daemon, just test given summary and body
-	                        against filter-file and print the result back to
-	                        terminal.
-	  -t POPUP_TIMEOUT, --popup-timeout POPUP_TIMEOUT
-	                        Default timeout for notification popups removal
-	                        (default: 5000ms)
-	  -q QUEUE_LEN, --queue-len QUEUE_LEN
-	                        How many messages should be queued on tbf overflow
-	                        (default: 10)
-	  --layout-anchor {top_right,bottom_left,bottom_right,top_left}
-	                        Screen corner notifications gravitate to (default:
-	                        top_left).
-	  --layout-direction {horizontal,vertical}
-	                        Direction for notification stack growth from --layout-
-	                        anchor corner (default: vertical).
-	  --layout-margin LAYOUT_MARGIN
-	                        Margin between notifications, screen edges, and some
-	                        misc stuff (default: 3px).
-	  --icon-width px, --img-w px
-	                        Scale icon (preserving aspect ratio) to width.
-	  --icon-height px, --img-h px
-	                        Scale icon (preserving aspect ratio) to height.
-	  --tbf-size TBF_SIZE   Token-bucket message-flow filter (tbf) bucket size
-	                        (default: 4)
-	  --tbf-tick TBF_TICK   tbf update interval (new token), so token_inflow =
-	                        token / tbf_tick (default: 15s)
-	  --tbf-max-delay TBF_MAX_DELAY
-	                        Maxmum amount of seconds, between message queue flush
-	                        (default: 60s)
-	  --tbf-inc TBF_INC     tbf_tick multiplier on consequent tbf overflow
-	                        (default: 2)
-	  --tbf-dec TBF_DEC     tbf_tick divider on successful grab from non-empty
-	                        bucket, wont lower multiplier below 1 (default: 2)
-	  --debug               Enable debug logging to stderr.
+Lots of tunable options are available (run the thing with "--help" option to see
+the full list), but all-defaults should be the norm (naturally I use the
+defaults myself, because I'm the one who set them;).
 
 Use --debug option to get a verbose log of all that's happening there, which
 decisions are made and based on what data.
@@ -195,8 +133,8 @@ decisions are made and based on what data.
 DBus interface can be inspected via usual introspection methods (add "--xml" to
 get more canonical form):
 
-	gdbus introspect --session\
-	  --dest org.freedesktop.Notifications\
+	gdbus introspect --session \
+	  --dest org.freedesktop.Notifications \
 	  --object-path /org/freedesktop/Notifications
 
 It has two out-of-spec methods - "Set" and "Flush", more info on which can be
@@ -206,10 +144,10 @@ the [code](https://github.com/mk-fg/notification-thing/blob/master/notification_
 
 For example, to temporarily block/unblock all but the urgent notifications:
 
-	dbus-send --type=method_call\
-	  --dest=org.freedesktop.Notifications
-	  /org/freedesktop/Notifications\
-	  org.freedesktop.Notifications.Set\
+	dbus-send --type=method_call \
+	  --dest=org.freedesktop.Notifications \
+	  /org/freedesktop/Notifications \
+	  org.freedesktop.Notifications.Set \
 	  dict:string:boolean:plug_toggle,true
 
 Appearance (and some behavior) of the popup windows is subject to [gtk3
@@ -225,7 +163,8 @@ stylesheet though):
 	#notification #low { background-color: #bee3c6; }
 
 	#notification #summary {
+	  padding-left: 5px;
 	  font-size: 10;
-	  text-shadow: 1 1 0 gray;
+	  text-shadow: 1px 1px 0px gray;
 	}
 	#notification #body { font-size: 8; }
