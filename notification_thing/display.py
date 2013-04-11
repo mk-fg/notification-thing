@@ -63,10 +63,10 @@ class NotificationDisplay(object):
 			except GLib.GError as err:
 				log.warn('Failed to load default CSS style: {}'.format(err))
 			else: break
+			# Try to work around https://bugzilla.gnome.org/show_bug.cgi?id=678876 and similar bugs
 			if attempt == 0:
-				# Try to work around https://bugzilla.gnome.org/show_bug.cgi?id=678876
-				base_css = re.sub(b'text-shadow: [^;]+;', b'text-shadow: 1 1 0 gray;', base_css)
-			elif attempt == 1: base_css = re.sub(b'text-shadow: [^;]+;', b'', base_css)
+				base_css = re.sub(br'\btext-shadow:[^;]+;', b'text-shadow: 1 1 0 gray;', base_css)
+			elif attempt == 1: base_css = re.sub(br'\btext-shadow:[^;]+;', b'', base_css)
 			elif attempt == 2: base_css = self.base_css_min # last resort before no-css-at-all
 			else: break
 		return css
