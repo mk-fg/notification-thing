@@ -200,11 +200,12 @@ class NotificationMethods(object):
 		win = screen.get_active_window()
 		if not win: return False
 		win_state = win.get_state()
-		x,y,w,h = win.get_geometry()
-		return win_state & win_state.FULLSCREEN\
-			or ( x <= jitter and y <= jitter
-				and w >= screen.get_width() - jitter
-				and h >= screen.get_height() - jitter )
+		w, h = win.get_width(), win.get_height()
+		# get_geometry fails with "BadDrawable" from X if the window is closing,
+		#  and x/y parameters there are not absolute and useful anyway.
+		# x, y, w, h = win.get_geometry()
+		return (win_state & win_state.FULLSCREEN)\
+			or (w >= screen.get_width() - jitter and h >= screen.get_height() - jitter)
 
 	def filter(self, note):
 		# TODO: also, just update timeout if content is the same as one of the displayed
