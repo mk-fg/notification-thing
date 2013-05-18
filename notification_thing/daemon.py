@@ -174,6 +174,20 @@ class NotificationMethods(object):
 		self._activity_event()
 		return self.flush(force=True)
 
+	def List(self):
+		log.debug('NotificationList call')
+		self._activity_event()
+		return self._note_windows.keys()
+
+	def Cleanup(self, timeout):
+		log.debug('NotificationCleanup call (timeout={:.1f}s)'.format(timeout))
+		self._activity_event()
+		ts_min = time() - timeout
+		for nid, note in self._note_windows.items():
+			if note.created < ts_min:
+				self.close(nid, reason=close_reasons.closed)
+
+
 	def Notify(self, app_name, nid, icon, summary, body, actions, hints, timeout):
 		self._activity_event()
 		note = core.Notification.from_dbus(
@@ -383,6 +397,8 @@ def _add_dbus_decorators(cls_name, cls_parents, cls_attrs):
 			(signal, 'NotificationClosed', 'uu'),
 			(signal, 'ActionInvoked', 'us'),
 			(method, 'Flush', '', ''),
+			(method, 'List', '', 'ai'),
+			(method, 'Cleanup', 'd', ''),
 			(method, 'Notify', 'susssasa{sv}i', 'u'),
 			(method, 'CloseNotification', 'u', '') ]:
 		(wrapper, name), args = wrapper[:2], wrapper[2:]

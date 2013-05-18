@@ -2,6 +2,7 @@
 from __future__ import unicode_literals, print_function
 
 import itertools as it, operator as op, functools as ft
+from time import time
 import dbus, argparse, re
 
 from .scheme import load, init_env
@@ -41,7 +42,9 @@ layout_direction = Enum('horizontal', 'vertical')
 
 
 class Notification(dict):
-	__slots__ = tuple()
+
+	__slots__ = 'created',
+
 	dbus_args = 'app_name', 'replaces_id', 'icon',\
 		'summary', 'body', 'actions', 'hints', 'timeout'
 	default_timeout = optz['popup_timeout']
@@ -54,6 +57,7 @@ class Notification(dict):
 	def __init__( self, summary='', body='', timeout=-1, icon='',
 			app_name='generic', replaces_id=dbus.UInt32(), actions=dbus.Array(signature='s'),
 			hints=dict(urgency=dbus.Byte(urgency_levels.critical, variant_level=1)) ):
+		self.created = time()
 		if timeout == -1: timeout = self.default_timeout # yes, -1 is special-case value in specs
 		argz = self.__init__.func_code.co_varnames # a bit hacky, but DRY
 		super(Notification, self).__init__(
