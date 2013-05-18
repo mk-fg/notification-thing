@@ -137,18 +137,34 @@ get more canonical form):
 	  --dest org.freedesktop.Notifications \
 	  --object-path /org/freedesktop/Notifications
 
-It has two out-of-spec methods - "Set" and "Flush", more info on which can be
-found [here](http://blog.fraggod.net/2010/12/Further-improvements-on-notification-daemon)
-and [here](http://blog.fraggod.net/2011/8/Notification-daemon-in-python) or in
-the [code](https://github.com/mk-fg/notification-thing/blob/master/notification_thing/daemon.py).
+It has additional "Flush" method to cleanup all the displayed notification
+bubbles and implements "org.freedesktop.DBus.Properties" interface.
+More info on these can be found
+[here](http://blog.fraggod.net/2010/12/Further-improvements-on-notification-daemon)
+and [here](http://blog.fraggod.net/2011/8/Notification-daemon-in-python) (or in
+the [code](https://github.com/mk-fg/notification-thing/blob/master/notification_thing/daemon.py),
+of course).
 
 For example, to temporarily block/unblock all but the urgent notifications:
 
 	dbus-send --type=method_call \
 	  --dest=org.freedesktop.Notifications \
 	  /org/freedesktop/Notifications \
-	  org.freedesktop.Notifications.Set \
-	  dict:string:boolean:plug_toggle,true
+	  org.freedesktop.DBus.Properties.Set \
+		org.freedesktop.Notifications \
+	  string:plug variant:string:toggle
+
+Supported properties (full list can be acquired via "GetAll" method) are:
+
+ - "plug" (bool or "toggle") - block notification bubbles from displaying,
+   queueing them up to display when it will be disabled.
+
+ - "urgent" (bool or "toggle") - display notifications with urgency=critical
+   immediately, regardless of rate-limiting or fullscreen-app check.
+
+ - "cleanup" (bool or "toggle") - enable/disable cleanup timeout for
+   notification bubbles. Disabled timeout will mean that they will hang around
+   forever, until manually dismissed (either by clicking or via "Flush" method).
 
 Appearance (and some behavior) of the popup windows is subject to [gtk3
 styles](http://developer.gnome.org/gtk3/unstable/GtkCssProvider.html) (simple css

@@ -6,7 +6,7 @@ import itertools as it, operator as op, functools as ft
 from time import time
 from dbus.mainloop.glib import DBusGMainLoop
 import dbus, dbus.service
-import os, sys, traceback
+import os, sys, traceback, types
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -95,29 +95,45 @@ class NotificationMethods(object):
 		log.debug('Um... some action invoked? Params: {}'.format([nid, action_key]))
 
 
-	def Flush(self):
-		log.debug('Manual flush of the notification buffer')
-		self._activity_event()
-		return self.flush(force=True)
+	def Get(self, iface, k):
+		return self.GetAll(iface)[k]
 
-	def Set(self, params):
+	def GetAll(self, iface):
+		if iface != self.dbus_interface:
+			raise dbus.exceptions.DBusException(
+				'This object does not implement the {!r} interface'.format(unicode(iface)) )
 		self._activity_event()
-		# Urgent-passthrough controls
-		if params.pop('urgent_toggle', None): params['urgent'] = not optz.urgency_check
-		try: val = params.pop('urgent')
-		except KeyError: pass
-		else:
-			optz.urgency_check = val
+		return dict( urgent=optz.urgency_check,
+			plug=self.plugged, cleanup=self.timeout_cleanup )
+
+	def Set(self, iface, k, v):
+		if iface != self.dbus_interface:
+			raise dbus.exceptions.DBusException(
+				'This object does not implement the {!r} interface'.format(unicode(iface)) )
+		self._activity_event()
+
+		if isinstance(v, types.StringTypes):
+			v = unicode(v)
+			if v == 'toggle': k, v = '{}_toggle'.format(k), True
+			elif v.lower() in {'n', 'no', 'false', 'disable', 'off', '-'}: v = False
+		k, v = unicode(k), bool(v)
+		if k.endswith('_toggle'):
+			k = k[:-7]
+			v = not self.Get(iface, k)
+
+		log.debug('Property change: {} = {}'.format(k, v))
+
+		if k == 'urgent':
+			if optz.urgency_check == v: return
+			optz.urgency_check = v
 			if optz.status_notify:
 				self.display(
 					'Urgent messages passthrough {}'.format(
 						'enabled' if optz.urgency_check else 'disabled' ) )
-		# Plug controls
-		if params.pop('plug_toggle', None): params['plug'] = not self.plugged
-		try: val = params.pop('plug')
-		except KeyError: pass
-		else:
-			if val:
+
+		elif k == 'plug':
+			if self.plugged == v: return
+			if v:
 				self.plugged = True
 				log.debug('Notification queue plugged')
 				if optz.status_notify:
@@ -132,19 +148,31 @@ class NotificationMethods(object):
 				if self._note_buffer:
 					log.debug('Flushing plugged queue')
 					self.flush()
-		# Timeout override
-		if params.pop('cleanup_toggle', None): params['cleanup'] = not self.timeout_cleanup
-		try: val = params.pop('cleanup')
-		except KeyError: pass
-		else:
-			self.timeout_cleanup = val
+
+		elif k == 'cleanup':
+			if self.timeout_cleanup == v: return
+			self.timeout_cleanup = v
 			log.debug('Cleanup timeout: {}'.format(self.timeout_cleanup))
 			if optz.status_notify:
 				self.display( 'Notification proxy: cleanup timeout is {}'\
 					.format('enabled' if self.timeout_cleanup else 'disabled') )
-		# Notify about malformed arguments, if any
-		if params and optz.status_notify:
-			self.display('Notification proxy: unrecognized parameters', repr(params))
+
+		elif optz.status_notify:
+			self.display( 'notification-thing:'
+				' unrecognized parameter', 'Key: {!r}, value: {!r}'.format(k, v) )
+			return
+
+		self.PropertiesChanged(iface, {k: v}, [])
+
+	def PropertiesChanged(self, iface, props_changed, props_invalidated):
+		log.debug( 'PropertiesChanged signal: {}'\
+			.format([iface, props_changed, props_invalidated]) )
+
+
+	def Flush(self):
+		log.debug('Manual flush of the notification buffer')
+		self._activity_event()
+		return self.flush(force=True)
 
 	def Notify(self, app_name, nid, icon, summary, body, actions, hints, timeout):
 		self._activity_event()
@@ -344,20 +372,29 @@ class NotificationMethods(object):
 
 
 def _add_dbus_decorators(cls_name, cls_parents, cls_attrs):
+	cls_attrs['dbus_interface'] = optz.dbus_interface
 	method, signal = dbus.service.method, dbus.service.signal
 	assert NotificationMethods in cls_parents
 	methods = vars(NotificationMethods)
+	# Main interface
 	for wrapper in [
 			(method, 'GetCapabilities', '', 'as'),
 			(method, 'GetServerInformation', '', 'ssss'),
 			(signal, 'NotificationClosed', 'uu'),
 			(signal, 'ActionInvoked', 'us'),
 			(method, 'Flush', '', ''),
-			(method, 'Set', 'a{sb}', ''),
 			(method, 'Notify', 'susssasa{sv}i', 'u'),
 			(method, 'CloseNotification', 'u', '') ]:
 		(wrapper, name), args = wrapper[:2], wrapper[2:]
 		cls_attrs[name] = wrapper(optz.dbus_interface, *args)(methods[name])
+	# Properties interface
+	for wrapper in [
+			(method, 'Get', 'ss', 'v'),
+			(method, 'GetAll', 's', 'a{sv}'),
+			(method, 'Set', 'ssv', ''),
+			(signal, 'PropertiesChanged', 'sa{sv}as') ]:
+		(wrapper, name), args = wrapper[:2], wrapper[2:]
+		cls_attrs[name] = wrapper(dbus.PROPERTIES_IFACE, *args)(methods[name])
 	return type(cls_name, cls_parents, cls_attrs)
 
 def notification_daemon_factory(*dbus_svc_argz, **dbus_svc_kwz):
