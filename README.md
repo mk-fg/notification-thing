@@ -137,8 +137,8 @@ get more canonical form):
 	  --dest org.freedesktop.Notifications \
 	  --object-path /org/freedesktop/Notifications
 
-It has additional "Flush" method to cleanup all the displayed notification
-bubbles and implements "org.freedesktop.DBus.Properties" interface.
+It has additional "Flush" method to display all queued notifications and
+implements "org.freedesktop.DBus.Properties" interface.
 More info on these can be found
 [here](http://blog.fraggod.net/2010/12/Further-improvements-on-notification-daemon)
 and [here](http://blog.fraggod.net/2011/8/Notification-daemon-in-python) (or in
