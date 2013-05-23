@@ -153,6 +153,7 @@ class NotificationDisplay(object):
 			frame.add(h_box)
 			h_box.pack_start(widget_icon, False, False, 0)
 			h_box.pack_start(v_box, True, True, 0)
+			ev_boxes.append(h_box)
 		else: frame.add(v_box)
 
 		widget_summary = Gtk.Label(name='summary', label=summary)
@@ -162,6 +163,7 @@ class NotificationDisplay(object):
 			summary_box.add(widget_summary)
 		else: summary_box = widget_summary
 		v_box.pack_start(summary_box, False, False, 0)
+		ev_boxes.append(summary_box)
 
 		v_box.pack_start(Gtk.HSeparator(name='hs'), False, False, 0)
 
