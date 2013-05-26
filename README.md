@@ -175,7 +175,7 @@ styles](http://developer.gnome.org/gtk3/unstable/GtkCssProvider.html) (simple cs
 files), with default being the light one (see the actual code for up-to-date
 stylesheet though):
 
-	#notification { background-color: white; }
+	#notification * { background-color: white; }
 	#notification #hs { background-color: black; }
 
 	#notification #critical { background-color: #ffaeae; }
@@ -184,7 +184,7 @@ stylesheet though):
 
 	#notification #summary {
 	  padding-left: 5px;
-	  font-size: 10;
+	  font-size: 10px;
 	  text-shadow: 1px 1px 0px gray;
 	}
-	#notification #body { font-size: 8; }
+	#notification #body { font-size: 8px; }
