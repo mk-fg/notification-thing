@@ -179,13 +179,17 @@ class NotificationMethods(object):
 		self._activity_event()
 		return self._note_windows.keys()
 
-	def Cleanup(self, timeout):
-		log.debug('NotificationCleanup call (timeout={:.1f}s)'.format(timeout))
+	def Cleanup(self, timeout, max_count):
+		log.debug( 'NotificationCleanup call'
+			' (timeout={:.1f}s, max_count={})'.format(timeout, max_count) )
 		self._activity_event()
+		if max_count <= 0: max_count = None
 		ts_min = time() - timeout
-		for nid, note in self._note_windows.items():
-			if note.created < ts_min:
-				self.close(nid, reason=close_reasons.closed)
+		for nid, note in sorted(self._note_windows.viewitems(), key=lambda t: t[1].created):
+			if note.created < ts_min: self.close(nid, reason=close_reasons.closed)
+			if max_count is not None:
+				max_count -= 1
+				if max_count <= 0: break
 
 
 	def Notify(self, app_name, nid, icon, summary, body, actions, hints, timeout):
@@ -398,7 +402,7 @@ def _add_dbus_decorators(cls_name, cls_parents, cls_attrs):
 			(signal, 'ActionInvoked', 'us'),
 			(method, 'Flush', '', ''),
 			(method, 'List', '', 'ai'),
-			(method, 'Cleanup', 'd', ''),
+			(method, 'Cleanup', 'du', ''),
 			(method, 'Notify', 'susssasa{sv}i', 'u'),
 			(method, 'CloseNotification', 'u', '') ]:
 		(wrapper, name), args = wrapper[:2], wrapper[2:]

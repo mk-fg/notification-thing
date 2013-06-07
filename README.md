@@ -142,8 +142,11 @@ Extra non-spec methods:
  - "Flush" - no args, no returns - display all queued (due to rate-limiting)
    notifications.
 
- - "Cleanup" - args: timeout (double), no returns - close currently-displayed
-   notifications older than passed timeout (seconds).
+ - "Cleanup" - args: timeout (double), max_count (uint32), no returns - close
+   currently-displayed notifications older than passed timeout (seconds).
+   Notification bubbles are closed in oldest-first order up to "max_count" value
+   (0 - all), so to close one oldest note, one might pass timeout=0,
+   max_count=1.
 
  - "List" - no args, returns array of int32 - return list of currently-displayed
    notification ids.
