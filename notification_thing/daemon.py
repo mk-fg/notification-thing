@@ -186,7 +186,8 @@ class NotificationMethods(object):
 		if max_count <= 0: max_count = None
 		ts_min = time() - timeout
 		for nid, note in sorted(self._note_windows.viewitems(), key=lambda t: t[1].created):
-			if note.created < ts_min: self.close(nid, reason=close_reasons.closed)
+			if note.created > ts_min: break
+			self.close(nid, reason=close_reasons.closed)
 			if max_count is not None:
 				max_count -= 1
 				if max_count <= 0: break
