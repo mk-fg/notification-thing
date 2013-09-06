@@ -23,7 +23,7 @@ class NotificationDisplay(object):
 
 	window = namedtuple('Window', 'gobj event_boxes')
 	base_css = b'''
-		#notification * { background-color: white; }
+		#notification * { background-color: rgba(255, 255, 255, 0); }
 		#notification #hs { background-color: black; }
 
 		#notification #critical { background-color: #ffaeae; }
@@ -58,18 +58,21 @@ class NotificationDisplay(object):
 
 	def _get_default_css(self):
 		css, base_css = Gtk.CssProvider(), self.base_css
-		for attempt in xrange(5):
+		for attempt in xrange(6):
 			try: css.load_from_data(base_css)
 			except GLib.GError as err:
-				log.warn('Failed to load default CSS style: {}'.format(err))
+				log.warn('Failed to load default CSS style (try {}): {}'.format(attempt+1, err))
+				# print(base_css)
 			else: break
 			# Try to work around https://bugzilla.gnome.org/show_bug.cgi?id=678876 and similar issues
 			if attempt == 0:
-				base_css = re.sub(br'\b(font-size:)\s*(\d+)px\s*;', br'\1 \2;', base_css)
+				base_css = re.sub(br'\b(background-color:)\s*rgba\([^;]+;', br'\1 white;', base_css)
 			elif attempt == 1:
+				base_css = re.sub(br'\b(font-size:)\s*(\d+)px\s*;', br'\1 \2;', base_css)
+			elif attempt == 2:
 				base_css = re.sub(br'\b(text-shadow:)[^;]+;', br'\1 1 1 0 gray;', base_css)
-			elif attempt == 2: base_css = re.sub(br'\btext-shadow:[^;]+;', b'', base_css)
-			elif attempt == 3: base_css = self.base_css_min # last resort before no-css-at-all
+			elif attempt == 3: base_css = re.sub(br'\btext-shadow:[^;]+;', b'', base_css)
+			elif attempt == 4: base_css = self.base_css_min # last resort before no-css-at-all
 			else: break # don't load any css
 		return css
 
