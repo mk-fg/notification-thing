@@ -241,7 +241,6 @@ class NotificationMethods(object):
 				self.display('Notification proxy: notification filters failed', ex)
 			return True
 
-	@property
 	def _fullscreen_check(self, jitter=5):
 		screen = Gdk.Screen.get_default()
 		win = screen.get_active_window()
@@ -255,14 +254,9 @@ class NotificationMethods(object):
 			or (w >= screen.get_width() - jitter and h >= screen.get_height() - jitter)
 
 	def filter(self, note):
-		# TODO: also, just update timeout if content is the same as one of the displayed
 		try: urgency = int(note.hints['urgency'])
-		except KeyError: urgency = None
-
-		plug = self.plugged or (optz.fs_check and self._fullscreen_check)
-		urgent = optz.urgency_check and urgency == core.urgency_levels.critical
-
-		if urgent: # special case - no buffer checks
+		except (KeyError, ValueError): urgency = None
+		if optz.urgency_check and urgency == core.urgency_levels.critical:
 			self._note_limit.consume()
 			log.debug( 'Urgent message immediate passthru'
 				', tokens left: {}'.format(self._note_limit.tokens) )
@@ -272,6 +266,7 @@ class NotificationMethods(object):
 			log.debug('Dropped notification due to negative filtering result')
 			return 0
 
+		plug = self.plugged or (optz.fs_check and self._fullscreen_check())
 		if plug or not self._note_limit.consume():
 			# Delay notification
 			to = self._note_limit.get_eta() if not plug else poll_interval
@@ -312,7 +307,7 @@ class NotificationMethods(object):
 
 		self._note_limit.consume()
 		if not force:
-			if optz.fs_check and (self.plugged or self._fullscreen_check):
+			if optz.fs_check and (self.plugged or self._fullscreen_check()):
 				log.debug( '{} detected, delaying buffer flush by {}s'\
 					.format(( 'Fullscreen window'
 						if not self.plugged else 'Plug' ), poll_interval) )
