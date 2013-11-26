@@ -4,6 +4,7 @@ from __future__ import unicode_literals, print_function
 
 import itertools as it, operator as op, functools as ft
 from time import time
+from collections import Mapping
 from dbus.mainloop.glib import DBusGMainLoop
 import dbus, dbus.service
 import os, sys, traceback, types
@@ -428,7 +429,17 @@ def notification_daemon_factory(*dbus_svc_argz, **dbus_svc_kwz):
 
 
 
-def main():
+def flatten_dict(data, path=tuple()):
+	dst = list()
+	for k,v in data.iteritems():
+		k = path + (k,)
+		if isinstance(v, Mapping):
+			for v in flatten_dict(v, k): dst.append(v)
+		else: dst.append((k, v))
+	return dst
+
+
+def main(argv=None):
 	global optz, log
 	import argparse
 
@@ -440,6 +451,13 @@ def main():
 		return EnumAction
 
 	parser = argparse.ArgumentParser(description='Desktop notification server.')
+
+	parser.add_argument('--conf', metavar='path',
+		help='Read option values from specified YAML configuration file.'
+			' Keys in subsectons (like "tbf.size") will be joined with'
+				' parent section name with dash (e.g. --tbf-size).'
+			' Any values specified on command line will override corresponding ones from file.'
+			' See also notification_thing.example.yaml file.')
 
 	parser.add_argument('-f', '--no-fs-check',
 		action='store_false', dest='fs_check', default=True,
@@ -497,7 +515,19 @@ def main():
 
 	parser.add_argument('--debug', action='store_true', help='Enable debug logging to stderr.')
 
-	optz = parser.parse_args()
+	args = argv or sys.argv[1:]
+	optz = parser.parse_args(args)
+
+	if optz.conf:
+		import yaml
+		for k, v in flatten_dict(yaml.load(open(optz.conf))):
+			if v is None: continue
+			k = '_'.join(k).replace('-', '_')
+			if not hasattr(optz, k):
+				parser.error('Unrecognized option in config file ({}): {}'.format(optz.conf, k))
+			setattr(optz, k, v)
+		optz = parser.parse_args(args, optz) # re-parse to override cli-specified values
+
 	optz.filter_file = os.path.expanduser(optz.filter_file)
 	core.Notification.default_timeout = optz.popup_timeout
 
@@ -520,4 +550,4 @@ def main():
 	loop.run()
 
 
-if __name__ == '__main__': main()
+if __name__ == '__main__': sys.exit(main())

@@ -1,0 +1,26 @@
+# Use alternative dbus interface/object path
+# dbus:
+#   interface: my.custom.Notifications
+#   path: /my/custom/notification_daemon_a
+
+# Parameters for token-bucket filter (see --tbf-*)
+# tbf:
+#   size: 10
+#   tick: 30
+#   max_delay: 30
+
+# Same thing as above, but in a flattened form
+# Note that _ and - can be used interchangeably
+# tbf_size: 10
+# tbf-tick: 30
+# tbf_max_delay: 30
+
+# Network relay configuration
+# net:
+#   sub:
+#     bind: 0.0.0.0:1234
+#     connect:
+#       # List of values can be specified for options that can be used multiple times
+#       - 192.168.11.2:1235
+#       - 192.168.11.3:1235
+#   pub-bind: 0.0.0.0:1235
