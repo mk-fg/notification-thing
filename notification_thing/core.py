@@ -76,7 +76,7 @@ class Notification(MutableMapping):
 		if not k.startswith('__'): return self.data[k]
 		else: raise AttributeError
 	def __setattr__(self, k, v):
-		if hasattr(self, k): self.__dict__[k] = v
+		if hasattr(self, k) or k not in self.data: self.__dict__[k] = v
 		else: self.data[k] = v
 
 	def __len__(self): return len(self.data)
