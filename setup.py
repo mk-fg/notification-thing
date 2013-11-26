@@ -12,12 +12,12 @@ except IOError: readme = ''
 setup(
 
 	name = 'notification-thing',
-	version = '12.05.1',
+	version = '13.11.0',
 	author = 'Mike Kazantsev',
 	author_email = 'mk.fraggod@gmail.com',
 	license = 'WTFPL',
 	keywords = 'desktop notification popups libnotify dbus'
-		' gtk+ gtk3 gobject-introspection rate-limiting distraction',
+		' gtk+ gtk3 gobject-introspection rate-limiting distraction zeromq',
 	url = 'http://github.com/mk-fg/notification-thing',
 
 	description = 'Python-based implementation of'
@@ -42,4 +42,5 @@ setup(
 	packages = find_packages(),
 
 	entry_points = dict(console_scripts=[
-		'notification-thing = notification_thing.daemon:main' ]) )
+		'notification-thing = notification_thing.daemon:main',
+		'notify-net = notification_thing.net_client:main' ]) )
