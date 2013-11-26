@@ -2,6 +2,7 @@
 from __future__ import unicode_literals, print_function
 
 import itertools as it, operator as op, functools as ft
+from collections import namedtuple, MutableMapping
 from time import time
 import dbus, argparse, re
 
@@ -41,9 +42,9 @@ layout_direction = Enum('horizontal', 'vertical')
 ####
 
 
-class Notification(dict):
+class Notification(MutableMapping):
 
-	__slots__ = 'created',
+	data = created = None
 
 	dbus_args = 'app_name', 'replaces_id', 'icon',\
 		'summary', 'body', 'actions', 'hints', 'timeout'
@@ -56,22 +57,37 @@ class Notification(dict):
 
 	def __init__( self, summary='', body='', timeout=-1, icon='',
 			app_name='generic', replaces_id=dbus.UInt32(), actions=dbus.Array(signature='s'),
-			hints=dict(urgency=dbus.Byte(urgency_levels.critical, variant_level=1)) ):
+			hints=dict(), urgency_critical=True ):
+
+		if urgency_critical:
+			hints['urgency'] = dbus.Byte(urgency_levels.critical, variant_level=1)
 		self.created = time()
 		if timeout == -1: timeout = self.default_timeout # yes, -1 is special-case value in specs
-		argz = self.__init__.func_code.co_varnames # a bit hacky, but DRY
-		super(Notification, self).__init__(
-			it.izip(argz, op.itemgetter(*argz)(locals())) )
+
+		args = 'summary', 'body', 'timeout', 'icon', 'app_name', 'replaces_id', 'actions', 'hints'
+		self.data = dict(it.izip(args, op.itemgetter(*args)(locals())))
 
 	def __iter__(self):
-		return iter(op.itemgetter(*self.dbus_args)(self))
-
+		return iter(op.itemgetter(*self.dbus_args)(self.data))
 	def __getattr__(self, k):
-		if not k.startswith('__'): return self[k]
+		if not k.startswith('__'): return self.data[k]
 		else: raise AttributeError
-	def __setattr__(self, k, v): self[k] = v
+	def __setattr__(self, k, v):
+		if hasattr(self, k): self.__dict__[k] = v
+		else: self.data[k] = v
+
+	def __len__(self): return len(self.data)
+	def __getitem__(self, k): return self.data[k]
+	def __setitem__(self, k, v): self.data[k] = v
+	def __delitem__(self, k): del self.data[k]
+
+# As serialized for pubsub transport
+NotificationMessage = namedtuple('NotificationMessage', 'hostname ts note')
 
 
-init_env({ '~':
-	lambda regex, string: bool(re.search(regex, string)) })
-def get_filter(path): return load(path)
+_scheme_init = False
+
+def get_filter(path):
+	if not _scheme_init:
+		init_env({'~': lambda regex, string: bool(re.search(regex, string))})
+	return load(path)
