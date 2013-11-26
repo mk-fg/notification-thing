@@ -2,7 +2,7 @@
 from __future__ import print_function
 
 import itertools as it, operator as op, functools as ft
-from time import time, sleep
+from time import time
 import os, sys, types, re
 
 from .core import Notification, NotificationMessage
@@ -30,7 +30,7 @@ class PubSub(object):
 				Should be float of seconds to linger on close, attempting to deliver stuff.
 			reconnect_max - max interval between peer reconnection attempts.'''
 		self.hostname, self.buffer = hostname or os.uname()[1], buffer
-		self.blocking_send, self.blocking_sock, self.blocking_count = blocking_send, None, 0
+		self.blocking_send = blocking_send
 		self._init_id(peer_id)
 		self._init_encoding()
 		self._init_zmq(reconnect_max=reconnect_max)
@@ -90,7 +90,6 @@ class PubSub(object):
 	@_peer_addr_func
 	def connect(self, addr):
 		'Publish messages to specified remote peer.'
-		if self.blocking_sock: self.blocking_count += 1
 		self.pub.connect(addr)
 
 	@_peer_addr_func
@@ -103,41 +102,12 @@ class PubSub(object):
 		'Bind sub sucket to sepcified address.'
 		self.sub.bind(addr)
 
-	def connect_block(self, timeout=-1, count=None):
-		'''Wait until specified number of peer(s) get connected (initiated via "connect" method).
-			Keeps same backlog of connection events b/w invocations,
-				so ideally should be called before "connect" calls to establish a listening socket.
-			Waits for all "connect" calls to succeed by default.
-			Returns count of connections that timed-out (0 - all succeeded).'''
-		if not hasattr(self.pub, 'monitor'): # pyzmq < 14.0.0
-			if timeout >= 0: sleep(timeout)
-			return
-		if not self.blocking_sock:
-			self.blocking_sock = self.ctx.socket(self.zmq.PAIR)
-			self.blocking_sock.bind('inproc://monitor.pub')
-			self.blocking_sock.setsockopt(self.zmq.LINGER, 0)
-			self.pub.monitor('inproc://monitor.pub', self.zmq.EVENT_CONNECTED)
-		if count is None: count = self.blocking_count
-		ts = time()
-		deadline = ts + timeout
-		while count >= 1 or ts >= deadline:
-			self.blocking_sock.setsockopt(
-				self.zmq.RCVTIMEO, max(1, int((deadline - ts)*1000)) )
-			try: self.blocking_sock.recv()
-			except self.zmq.ZMQError as err:
-				if err.errno != self.zmq.EAGAIN: raise
-				return count
-			count -= 1
-			ts = time()
-		return count
-
 	def fileno(self):
 		return self.sub.getsockopt(self.zmq.FD)
 
 	def close(self):
 		for sock in self.pub, self.sub:
 			if sock: sock.close()
-		if self.blocking_sock: self.blocking_sock.close()
 		if self.ctx: self.ctx.term()
 		self.pub = self.sub = self.ctx = None
 

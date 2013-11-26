@@ -4,6 +4,7 @@ from __future__ import unicode_literals, print_function
 
 import itertools as it, operator as op, functools as ft
 from contextlib import closing
+from time import sleep
 import os, sys
 
 if __name__ == '__main__':
@@ -35,10 +36,9 @@ def main(args=None):
 		help='Source name to use for dispatched message.')
 	parser.add_argument('-s', '--stdin', action='store_true', help='Read message body from stdin.')
 	parser.add_argument('-w', '--wait-connect',
-		type=float, metavar='seconds', default=1.5,
-		help='Timeout to wait for peer connections to establish (default: %(default)s).'
-			' If socket_monitor is not supported by zmq,'
-				' then it is a mandatory delay before sending message.')
+		type=float, metavar='seconds', default=0.5,
+		help='Timeout to wait for peer connections to'
+			' establish (default: %(default)s) and unsent messages to linger.')
 
 	parser.add_argument('-u', '--urgency', metavar='low/normal/critical',
 		help='Urgency hint to use for the message - can be either integer'
@@ -90,13 +90,11 @@ def main(args=None):
 	## Dispatch
 	with closing(PubSub( opts.hostname,
 			reconnect_max=None, blocking_send=opts.wait_connect )) as pub:
-		pub.connect_block()
 		log.debug('Connecting to %s peer(s)', len(opts.dst))
 		for dst in opts.dst: pub.connect(dst)
-		log.debug('Waiting for peer connections to be established (%ss)...', opts.wait_connect)
-		timeouts = pub.connect_block(timeout=opts.wait_connect)
-		if timeouts: log.debug('Timed-out peers: %s', timeouts)
+		sleep(opts.wait_connect)
 		log.debug('Dispatching notification')
 		pub.send(note)
+
 
 if __name__ == '__main__': sys.exit(main())
