@@ -25,15 +25,13 @@ if __name__ == '__main__':
 	module_root = realpath(dirname(dirname(__file__)))
 	if module_root not in sys.path: sys.path.insert(0, module_root)
 	from notification_thing.display import NotificationDisplay
+	from notification_thing.pubsub import PubSub
 	from notification_thing import core
 
 else:
 	from .display import NotificationDisplay
+	from .pubsub import PubSub
 	from . import core
-
-
-DBusGMainLoop(set_as_default=True)
-bus = dbus.SessionBus()
 
 optz, poll_interval, close_reasons, urgency_levels =\
 	core.optz, core.poll_interval, core.close_reasons, core.urgency_levels
@@ -44,7 +42,7 @@ class NotificationMethods(object):
 	plugged, timeout_cleanup = False, True
 	_activity_timer = None
 
-	def __init__(self):
+	def __init__(self, pubsub=None):
 		tick_strangle_max = op.truediv(optz.tbf_max_delay, optz.tbf_tick)
 		self._note_limit = core.FC_TokenBucket(
 			tick=optz.tbf_tick, burst=optz.tbf_size,
@@ -58,6 +56,11 @@ class NotificationMethods(object):
 			optz.layout_margin, optz.layout_anchor,
 			optz.layout_direction, optz.icon_width, optz.icon_height )
 		self._activity_event()
+
+		self.pubsub = pubsub
+		if pubsub:
+			GObject.io_add_watch( pubsub.fileno(),
+				GObject.IO_IN | GObject.IO_PRI, self._notify_pubsub )
 
 
 	def exit(self, reason=None):
@@ -194,12 +197,25 @@ class NotificationMethods(object):
 				if max_count <= 0: break
 
 
+	def _notify_pubsub(self, _fd, _ev):
+		try:
+			while True:
+				# TODO: process hostname/ts from msg
+				msg = self.pubsub.recv()
+				if msg is None: break
+				self._activity_event()
+				try: self.filter_display(msg.note)
+				except Exception:
+					log.exception('Unhandled error for remote notification')
+		finally: return True # for glib to keep watcher
+
 	def Notify(self, app_name, nid, icon, summary, body, actions, hints, timeout):
 		self._activity_event()
 		note = core.Notification.from_dbus(
 			app_name, nid, icon, summary, body, actions, hints, timeout )
+		if self.pubsub: self.pubsub.send(note)
 		if nid: self.close(nid, reason=close_reasons.closed)
-		try: return self.filter(note)
+		try: return self.filter_display(note)
 		except Exception:
 			log.exception('Unhandled error')
 			return 0
@@ -254,7 +270,7 @@ class NotificationMethods(object):
 		return (win_state & win_state.FULLSCREEN)\
 			or (w >= screen.get_width() - jitter and h >= screen.get_height() - jitter)
 
-	def filter(self, note):
+	def filter_display(self, note):
 		try: urgency = int(note.hints['urgency'])
 		except (KeyError, ValueError): urgency = None
 		if optz.urgency_check and urgency == core.urgency_levels.critical:
@@ -318,7 +334,8 @@ class NotificationMethods(object):
 		if self._note_buffer:
 			# Decided not to use replace_id here - several feeds are okay
 			self._flush_id = self.display( self._note_buffer[0]\
-				if len(self._note_buffer) == 1 else core.Notification(
+				if len(self._note_buffer) == 1\
+				else core.Notification.system_message(
 					'Feed' if not self._note_buffer.dropped
 						else 'Feed ({} dropped)'.format(self._note_buffer.dropped),
 					'\n\n'.join(it.starmap( '--- {}\n  {}'.format,
@@ -331,7 +348,7 @@ class NotificationMethods(object):
 	def display(self, note_or_summary, *argz, **kwz):
 		note = note_or_summary\
 			if isinstance(note_or_summary, core.Notification)\
-			else core.Notification(note_or_summary, *argz, **kwz)
+			else core.Notification.system_message(note_or_summary, *argz, **kwz)
 
 		if note.replaces_id in self._note_windows:
 			self.close(note.replaces_id, close_reasons.closed)
@@ -421,8 +438,8 @@ def notification_daemon_factory(*dbus_svc_argz, **dbus_svc_kwz):
 
 	class NotificationDaemon(NotificationMethods, dbus.service.Object):
 		__metaclass__ = _add_dbus_decorators
-		def __init__(self, *dbus_svc_argz, **dbus_svc_kwz):
-			NotificationMethods.__init__(self)
+		def __init__(self, pubsub, *dbus_svc_argz, **dbus_svc_kwz):
+			NotificationMethods.__init__(self, pubsub)
 			dbus.service.Object.__init__(self, *dbus_svc_argz, **dbus_svc_kwz)
 
 	return NotificationDaemon(*dbus_svc_argz, **dbus_svc_kwz)
@@ -513,6 +530,26 @@ def main(argv=None):
 	parser.add_argument('--dbus-path', default=optz['dbus_path'],
 		help='DBus object path to bind to (default: %(default)s)')
 
+	parser.add_argument('--net-pub-bind',
+		action='append', metavar='ip:port',
+		help='Publish messages over network on a specified socket endpoint.'
+			' Can be either ip:port (assumed to be tcp socket,'
+				' e.g. 1.2.3.4:5678) or full zmq url (e.g. tcp://1.2.3.4:5678).'
+			' Can be specified multiple times.')
+	parser.add_argument('--net-pub-connect',
+		action='append', metavar='ip:port',
+		help='Send published messages to specified subscriber socket (see --net-sub-bind).'
+			' Same format as for --net-pub-bind.  Can be specified multiple times.')
+	parser.add_argument('--net-sub-bind',
+		action='append', metavar='ip:port',
+		help='Create subscriber socket that'
+				' publishers can connect and send messages to (see --net-pub-connect).'
+			' Same format as for --net-pub-bind.  Can be specified multiple times.')
+	parser.add_argument('--net-sub-connect',
+		action='append', metavar='ip:port',
+		help='Receive published messages from a specified pub socket (see --net-pub-bind).'
+			' Same format as for --net-pub-bind.  Can be specified multiple times.')
+
 	parser.add_argument('--debug', action='store_true', help='Enable debug logging to stderr.')
 
 	args = argv or sys.argv[1:]
@@ -520,7 +557,7 @@ def main(argv=None):
 
 	if optz.conf:
 		import yaml
-		for k, v in flatten_dict(yaml.load(open(optz.conf))):
+		for k, v in flatten_dict(yaml.load(open(optz.conf)) or dict()):
 			if v is None: continue
 			k = '_'.join(k).replace('-', '_')
 			if not hasattr(optz, k):
@@ -543,7 +580,23 @@ def main(argv=None):
 	logging.basicConfig(level=logging.DEBUG if optz.debug else logging.WARNING)
 	log = logging.getLogger(__name__)
 
-	daemon = notification_daemon_factory( bus,
+	DBusGMainLoop(set_as_default=True)
+	bus = dbus.SessionBus()
+
+	if optz.net_pub_bind or optz.net_pub_connect\
+			or optz.net_sub_bind or optz.net_sub_connect:
+		pubsub = PubSub() # TODO: settings like hwm
+		for addrs, call in [
+				(optz.net_pub_bind, pubsub.bind_pub),
+				(optz.net_sub_bind, pubsub.bind_sub),
+				(optz.net_pub_connect, pubsub.connect),
+				(optz.net_sub_connect, pubsub.subscribe) ]:
+			for addr in set(addrs or set()):
+				log.debug('zmq link: %s %s', call.im_func.func_name, addr)
+				call(addr)
+	else: pubsub = None
+
+	daemon = notification_daemon_factory( pubsub, bus,
 		optz.dbus_path, dbus.service.BusName(optz.dbus_interface, bus) )
 	loop = GObject.MainLoop()
 	log.debug('Starting gobject loop')

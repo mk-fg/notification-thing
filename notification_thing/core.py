@@ -55,14 +55,17 @@ class Notification(MutableMapping):
 		'Get all arguments in dbus-interface order.'
 		return cls(**dict(it.izip(cls.dbus_args, argz)))
 
-	def __init__( self, summary='', body='', timeout=-1, icon='',
-			app_name='generic', replaces_id=dbus.UInt32(), actions=dbus.Array(signature='s'),
-			hints=dict(), urgency_critical=True ):
+	@classmethod
+	def system_message(cls, *argz, **kwz):
+		kwz.setdefault('hints', dict()).setdefault(
+			'urgency', dbus.Byte(urgency_levels.critical, variant_level=1) )
+		return cls(*argz, **kwz)
 
-		if urgency_critical:
-			hints['urgency'] = dbus.Byte(urgency_levels.critical, variant_level=1)
+	def __init__( self, summary='', body='', timeout=-1, icon='', app_name='generic',
+			replaces_id=dbus.UInt32(), actions=dbus.Array(signature='s'), hints=dict() ):
 		self.created = time()
 		if timeout == -1: timeout = self.default_timeout # yes, -1 is special-case value in specs
+		elif timeout is None: timeout = -1 # to be serialized or whatever
 
 		args = 'summary', 'body', 'timeout', 'icon', 'app_name', 'replaces_id', 'actions', 'hints'
 		self.data = dict(it.izip(args, op.itemgetter(*args)(locals())))

@@ -1,3 +1,6 @@
+
+## Note that any values specified on command line will override values here.
+
 # Use alternative dbus interface/object path
 # dbus:
 #   interface: my.custom.Notifications
