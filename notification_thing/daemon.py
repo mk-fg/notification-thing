@@ -434,7 +434,7 @@ class NotificationMethods(object):
 					GObject.source_remove(note.timer_id)
 
 				if delay is None: del self._note_windows[nid]
-				elif 'timer_id' in note: # these get sent very often
+				elif hasattr(note, 'timer_id'): # these get sent very often
 					if delay:
 						if note.timer_id:
 							note.timer_id, note.timer_left = None,\
