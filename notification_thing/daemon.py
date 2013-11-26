@@ -38,6 +38,44 @@ optz, poll_interval, close_reasons, urgency_levels =\
 
 
 
+def flatten_dict(data, path=tuple()):
+	dst = list()
+	for k,v in data.iteritems():
+		k = path + (k,)
+		if isinstance(v, Mapping):
+			for v in flatten_dict(v, k): dst.append(v)
+		else: dst.append((k, v))
+	return dst
+
+def ts_diff_format( seconds,
+		_units_days=dict(y=365.25, mo=30.5, w=7, d=0),
+		_units_s=dict(h=3600, m=60, s=0) ):
+	days = seconds // (24*3600)
+	seconds -= days * (24*3600)
+
+	res, d = list(), days
+	for unit, unit_days in sorted(
+			_units_days.iteritems(), key=op.itemgetter(1), reverse=True):
+		if d > unit_days or res:
+			res.append('{0:.0f}{1}'.format(
+				math.floor(d / unit_days) if unit_days else d, unit ))
+			if len(res) >= 2 or not unit_days: break
+			d = days % unit_days
+
+	if len(res) < 2:
+		s = seconds
+		for unit, unit_s in sorted(
+				_units_s.iteritems(), key=op.itemgetter(1), reverse=True):
+			if s > unit_s or res:
+				res.append('{0:.0f}{1}'.format(s / unit_s if unit_s else s, unit))
+				if len(res) >= 2 or not unit_s: break
+				s = seconds % unit_s
+
+	if not res: return 'just now'
+	else: return ' '.join(res)
+
+
+
 class NotificationMethods(object):
 	plugged, timeout_cleanup = False, True
 	_activity_timer = None
@@ -200,11 +238,15 @@ class NotificationMethods(object):
 	def _notify_pubsub(self, _fd, _ev):
 		try:
 			while True:
-				# TODO: process hostname/ts from msg
 				msg = self.pubsub.recv()
 				if msg is None: break
 				self._activity_event()
-				try: self.filter_display(msg.note)
+				note = msg.note
+				prefix, ts_diff = msg.hostname, time() - msg.ts
+				if ts_diff > 15 * 60: # older than 15min
+					prefix = '{}[{}]'.format(prefix, ts_diff_format(ts_diff))
+				note.summary = '{} // {}'.format(prefix, note.summary)
+				try: self.filter_display(note)
 				except Exception:
 					log.exception('Unhandled error for remote notification')
 		finally: return True # for glib to keep watcher
@@ -446,16 +488,6 @@ def notification_daemon_factory(*dbus_svc_argz, **dbus_svc_kwz):
 
 
 
-def flatten_dict(data, path=tuple()):
-	dst = list()
-	for k,v in data.iteritems():
-		k = path + (k,)
-		if isinstance(v, Mapping):
-			for v in flatten_dict(v, k): dst.append(v)
-		else: dst.append((k, v))
-	return dst
-
-
 def main(argv=None):
 	global optz, log
 	import argparse
@@ -549,6 +581,9 @@ def main(argv=None):
 		action='append', metavar='ip:port',
 		help='Receive published messages from a specified pub socket (see --net-pub-bind).'
 			' Same format as for --net-pub-bind.  Can be specified multiple times.')
+	parser.add_argument('--net-settings', metavar='yaml',
+		help='Optional yaml/json encoded settings'
+			' for PubSub class init (e.g. hostname, buffer, reconnect_max, etc).')
 
 	parser.add_argument('--debug', action='store_true', help='Enable debug logging to stderr.')
 
@@ -585,7 +620,10 @@ def main(argv=None):
 
 	if optz.net_pub_bind or optz.net_pub_connect\
 			or optz.net_sub_bind or optz.net_sub_connect:
-		pubsub = PubSub() # TODO: settings like hwm
+		if optz.net_settings and not isinstance(optz.net_settings, Mapping):
+			import yaml
+			optz.net_settings = yaml.load(optz.net_settings)
+		pubsub = PubSub(**(optz.net_settings or dict()))
 		for addrs, call in [
 				(optz.net_pub_bind, pubsub.bind_pub),
 				(optz.net_sub_bind, pubsub.bind_sub),
