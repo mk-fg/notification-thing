@@ -1,13 +1,12 @@
 notification-thing: Gtk3 (PyGI) notification daemon
 --------------------
 
-There are quite a few of the [notification
-spec](http://developer.gnome.org/notification-spec/) implementations, but this
-one is designed to be not tied to any DE, unlike (unfortunately) most of the
-others.
+There are quite a few of the [notification spec](http://developer.gnome.org/notification-spec/)
+implementations, but this one is designed to be not tied to any DE, unlike
+(unfortunately) most of the others were at the time.
 
-Another thing is that simple implementation of the spec doesn't work for me - I
-need rate-limiting (but without silent dropping of any messages - it's much
+Another thing is that simple implementation of the spec doesn't work for me -
+I need rate-limiting (but without silent dropping of any messages - it's much
 worse!) to maintain sanity while still paying any attention to these popups.
 
 Flexible-enough filtering is another thing.
@@ -17,6 +16,10 @@ not losing messages, which makes you always doubt and second-guess
 notifications, ending up doing the manual info-polling) of these popups during
 fullscreen apps (like when watching video or working on some urgent matter) is
 yet another...
+
+Any number of notification-thing instances can be linked via zeromq pub-sub
+sockets (i.e. each one subscribed to all the others) and display notifications
+that arrive via dbus on all other hosts.
 
 Actual notification rendering is inspired (and based in part on)
 [notipy](https://github.com/the-isz/notipy) project.
@@ -28,10 +31,8 @@ I wrote a few extended notes on the subject over time
 mostly summarized above.
 
 How it looks (with built-in css, see below on how to override):
-![displayed notifications
-shot](https://freecode.com/screenshots/99/a6/99a6235e6a09da8de7316684be59bccf_medium.png
-"A few notifications with a compositing wm (e17). Headers are colored (by
-default) by priority.")
+![displayed notifications shot](https://freecode.com/screenshots/99/a6/99a6235e6a09da8de7316684be59bccf_medium.png
+"A few notifications with a compositing wm (e17). Headers are colored (by default) by priority.")
 
 
 Installation
@@ -65,6 +66,11 @@ without any installation.
   [Gtk+](http://www.gtk.org/) 3.X (including Glib, Pango) and
   [PyGObject](http://live.gnome.org/PyGObject)
 
+* (optional) [PyYAML](http://pyyaml.org/) - to configure daemon via YAML file,
+  not CLI (--conf option).
+* (optional) [pyzmq](http://zeromq.github.io/pyzmq/) - to broadcast/receive
+  notification messages over zeromq pub/sub sockets.
+
 Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here -
 it's usually used to send the messages, not receive and display them.
 
@@ -80,8 +86,24 @@ whenever notifications arrive (and exiting during silence timeouts):
 
 	cp org.freedesktop.Notifications.service /usr/share/dbus-1/services/
 
-File ~/.notification_filter can be used to control filtering mechanism at
-runtime.
+
+##### Configuration
+
+Lots of tunable options are available (run the thing with "--help" option to see
+the full list), but all-defaults should be the norm (naturally use defaults myself).
+
+Use --debug option to get a verbose log of all that's happening there, which
+decisions are made and based on what data.
+
+[YAML](https://en.wikipedia.org/wiki/YAML) configuration file can be used to
+specify a lot of options in a more convenient and brief format, see --conf
+option and "notification_thing.example.yaml" config in the repo.
+
+
+##### Filtering
+
+File ~/.notification_filter (configurable via --filter-file option) can be used
+to control filtering mechanism at runtime.
 
 It's the simple scheme script, see [scheme
 submodule](https://github.com/mk-fg/notification-thing/blob/master/notification_thing/scheme.py)
@@ -123,12 +145,12 @@ or not. Example:
 ~/.notification_filter is reloaded on-the-fly if updated, any errors there will
 yield backtraces in notification windows.
 
-Lots of tunable options are available (run the thing with "--help" option to see
-the full list), but all-defaults should be the norm (naturally I use the
-defaults myself, because I'm the one who set them;).
+"--filter-test" option can be used to test message summary + body (supplied
+after option) against filter file - will just print filtering verdict for
+supplied data and exit.
 
-Use --debug option to get a verbose log of all that's happening there, which
-decisions are made and based on what data.
+
+##### Extra dbus commands
 
 DBus interface can be inspected via usual introspection methods (add "--xml" to
 get more canonical form):
@@ -170,13 +192,16 @@ For example, to temporarily block/unblock all but the urgent notifications:
 	  --dest=org.freedesktop.Notifications \
 	  /org/freedesktop/Notifications \
 	  org.freedesktop.DBus.Properties.Set \
-		org.freedesktop.Notifications \
+	  org.freedesktop.Notifications \
 	  string:plug variant:string:toggle
 
-Appearance (and some behavior) of the popup windows is subject to [gtk3
-styles](http://developer.gnome.org/gtk3/unstable/GtkCssProvider.html) (simple css
-files), with default being the light one (see the actual code for up-to-date
-stylesheet though):
+
+##### Appearance / styles
+
+Appearance (and some behavior) of the popup windows is subject to
+[gtk3 styles](http://developer.gnome.org/gtk3/unstable/GtkCssProvider.html)
+(simple css files), with default being the light one (see the actual code for
+up-to-date stylesheet though):
 
 	#notification * { background-color: white; }
 	#notification #hs { background-color: black; }
@@ -191,3 +216,26 @@ stylesheet though):
 	  text-shadow: 1px 1px 0px gray;
 	}
 	#notification #body { font-size: 8px; }
+
+
+##### Network broadcasting
+
+Needs pyzmq module, if used.
+
+Allows to serialize notifications received from dbus interface and publish them
+on zmq_pub socket.
+
+Any instances connected to that will receive notification, and any transient
+network issues should be handled by zeromq - pub socket should keep messages
+queued for subscribers it has seen (connected) at least once.
+
+Furthermore, it's not required that subscribers should connect to publishers or
+vice versa - any zeromq sockets can initiate connection to any other ones, so
+that e.g. "notify-net" tool (included) can create "pub" sucket and connect to a
+running daemon's "sub" socket on another machine - or any number of machines,
+just specify -d option many times - then publish messages there.
+
+See --net-* options for all that.
+
+Only limitation here is sanity - not much point linking e.g. subscriber sockets
+to each other.
