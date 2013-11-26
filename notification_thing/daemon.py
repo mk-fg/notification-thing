@@ -87,6 +87,7 @@ class NotificationMethods(object):
 			tick_strangle=lambda x: min(x*optz.tbf_inc, tick_strangle_max),
 			tick_free=lambda x: max(op.truediv(x, optz.tbf_dec), 1) )
 		self._note_buffer = core.RRQ(optz.queue_len)
+		self._note_history = core.RRQ(optz.history_len)
 		self._note_windows = dict()
 		self._note_id_pool = it.chain.from_iterable(
 			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
@@ -220,6 +221,13 @@ class NotificationMethods(object):
 		log.debug('NotificationList call')
 		self._activity_event()
 		return self._note_windows.keys()
+
+	def Redisplay(self):
+		log.debug('Redisplay call')
+		self._activity_event()
+		if not self._note_history: return 0
+		note = self._note_history.pop()
+		return self.display(note, redisplay=True)
 
 	def Cleanup(self, timeout, max_count):
 		log.debug( 'NotificationCleanup call'
@@ -387,10 +395,14 @@ class NotificationMethods(object):
 			log.debug('Notification buffer flushed')
 
 
-	def display(self, note_or_summary, *argz, **kwz):
-		note = note_or_summary\
-			if isinstance(note_or_summary, core.Notification)\
-			else core.Notification.system_message(note_or_summary, *argz, **kwz)
+	def display(self, note_or_summary, body='', redisplay=False):
+		if isinstance(note_or_summary, core.Notification):
+			if body:
+				raise TypeError('Either Notification object or summary/body should be passed, not both.')
+			note = note_or_summary
+		else:
+			note = core.Notification.system_message(note_or_summary, body)
+		if not redisplay: self._note_history.append(note.clone())
 
 		if note.replaces_id in self._note_windows:
 			self.close(note.replaces_id, close_reasons.closed)
@@ -412,6 +424,7 @@ class NotificationMethods(object):
 		log.debug( 'Created notification (id: {}, timeout: {} (ms))'\
 			.format(nid, self.timeout_cleanup and note.timeout) )
 		return nid
+
 
 	def close(self, nid=None, reason=close_reasons.undefined, delay=None):
 		if nid:
@@ -459,6 +472,7 @@ def _add_dbus_decorators(cls_name, cls_parents, cls_attrs):
 			(signal, 'ActionInvoked', 'us'),
 			(method, 'Flush', '', ''),
 			(method, 'List', '', 'ai'),
+			(method, 'Redisplay', '', 'u'),
 			(method, 'Cleanup', 'du', ''),
 			(method, 'Notify', 'susssasa{sv}i', 'u'),
 			(method, 'CloseNotification', 'u', '') ]:
@@ -531,7 +545,10 @@ def main(argv=None):
 	parser.add_argument('-t', '--popup-timeout', type=int, default=int(optz['popup_timeout']*1000),
 		help='Default timeout for notification popups removal (default: %(default)sms)')
 	parser.add_argument('-q', '--queue-len', type=int, default=optz['queue_len'],
-		help='How many messages should be queued on tbf overflow  (default: %(default)s)')
+		help='How many messages should be queued on tbf overflow (default: %(default)s)')
+	parser.add_argument('-s', '--history-len', type=int, default=optz['history_len'],
+		help='How many last *displayed* messages to'
+			' remember to display again on demand (default: %(default)s)')
 
 	parser.add_argument('--layout-anchor', choices=core.layout_anchor,
 		action=EnumAction(core.layout_anchor), default=core.layout_anchor.top_left,

@@ -28,7 +28,9 @@ class Enum(dict):
 
 ####
 
-optz = dict( activity_timeout=10*60, popup_timeout=5, queue_len=10,
+optz = dict(
+	activity_timeout=10*60, popup_timeout=5,
+	queue_len=10, history_len=30,
 	tbf_size=4, tbf_tick=15, tbf_max_delay=60, tbf_inc=2, tbf_dec=2,
 	dbus_interface='org.freedesktop.Notifications', dbus_path='/org/freedesktop/Notifications' )
 poll_interval = 60
@@ -83,6 +85,8 @@ class Notification(MutableMapping):
 	def __getitem__(self, k): return self.data[k]
 	def __setitem__(self, k, v): self.data[k] = v
 	def __delitem__(self, k): del self.data[k]
+
+	def clone(self): return Notification(**self.data)
 
 # As serialized for pubsub transport
 NotificationMessage = namedtuple('NotificationMessage', 'hostname ts note')

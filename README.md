@@ -173,6 +173,9 @@ Extra non-spec methods:
  - "List" - no args, returns array of int32 - return list of currently-displayed
    notification ids.
 
+ - "Redisplay" - no args, returns uint32 id of notification - re-displays last
+   message again, then the one before it and so on (see --history-len option).
+
 Daemon also implements "org.freedesktop.DBus.Properties" interface.
 Supported properties (full list can be acquired via usual "GetAll" method) are:
 
