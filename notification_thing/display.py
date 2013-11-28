@@ -3,7 +3,7 @@ from __future__ import unicode_literals, print_function
 
 import itertools as it, operator as op, functools as ft
 from collections import OrderedDict, namedtuple
-import os, urllib, re
+import os, urllib, re, types
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -97,7 +97,7 @@ class NotificationDisplay(object):
 		widget_icon = None
 
 		if icon is not None:
-			if isinstance(icon, unicode):
+			if isinstance(icon, types.StringTypes):
 				icon_path = os.path.expanduser(urllib.url2pathname(icon))
 				if icon_path.startswith('file://'): icon_path = icon_path[7:]
 				if os.path.isfile(icon_path):
