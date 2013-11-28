@@ -115,8 +115,9 @@ class NotificationMethods(object):
 					' due to existing windows (retry in {}s).'.format(optz.activity_timeout) )
 				self._activity_timer = None
 		if self._activity_timer: GObject.source_remove(self._activity_timer)
-		self._activity_timer = GObject.timeout_add_seconds(
-			optz.activity_timeout, self._activity_event, True )
+		if optz.activity_timeout and optz.activity_timeout > 0:
+			self._activity_timer = GObject.timeout_add_seconds(
+				optz.activity_timeout, self._activity_event, True )
 
 
 	def GetServerInformation(self):
