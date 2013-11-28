@@ -648,6 +648,7 @@ def main(argv=None):
 				(optz.net_sub_bind, pubsub.bind_sub),
 				(optz.net_pub_connect, pubsub.connect),
 				(optz.net_sub_connect, pubsub.subscribe) ]:
+			if isinstance(addrs, types.StringTypes): addrs = [addrs]
 			for addr in set(addrs or set()):
 				log.debug('zmq link: %s %s', call.im_func.func_name, addr)
 				call(addr)
