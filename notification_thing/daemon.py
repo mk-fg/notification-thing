@@ -254,18 +254,18 @@ class NotificationMethods(object):
 				if ts_diff > 15 * 60: # older than 15min
 					prefix = '{}[{}]'.format(prefix, ts_diff_format(ts_diff))
 				note.summary = '{} // {}'.format(prefix, note.summary)
-				try: self.filter_display(note)
-				except Exception:
-					log.exception('Unhandled error for remote notification')
+				self.filter_display(note)
+		except: log.exception('Unhandled error with remote notification')
 		finally: return True # for glib to keep watcher
 
 	def Notify(self, app_name, nid, icon, summary, body, actions, hints, timeout):
 		self._activity_event()
-		note = core.Notification.from_dbus(
-			app_name, nid, icon, summary, body, actions, hints, timeout )
-		if self.pubsub: self.pubsub.send(note)
-		if nid: self.close(nid, reason=close_reasons.closed)
-		try: return self.filter_display(note)
+		try:
+			note = core.Notification.from_dbus(
+				app_name, nid, icon, summary, body, actions, hints, timeout )
+			if self.pubsub: self.pubsub.send(note)
+			if nid: self.close(nid, reason=close_reasons.closed)
+			return self.filter_display(note)
 		except Exception:
 			log.exception('Unhandled error')
 			return 0
