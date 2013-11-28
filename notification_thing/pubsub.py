@@ -112,9 +112,21 @@ class PubSub(object):
 		self.pub = self.sub = self.ctx = None
 
 
+	def strip_dbus_types(self, data):
+		# Necessary because dbus types subclass pythin types,
+		#  yet don't serialize in the same way - e.g. str(dbus.Byte(1)) is '\x01'
+		#  (and not '1') - which messes up simple serializers like "json" module.
+		sdt = self.strip_dbus_types
+		if isinstance(data, dict): return dict((sdt(k), sdt(v)) for k,v in data.viewitems())
+		elif isinstance(data, list): return map(sdt, data)
+		for t in int, long, unicode, bytes, bool:
+			if isinstance(data, t): return t(data)
+		raise ValueError(( 'Failed to sanitize data type:'
+			' {} (mro: {}, value: {})' ).format(type(data), type(data).mro(), data))
+
 	def encode(self, note):
-		return chr(self.protocol_version)\
-			+ self.dumps([self.hostname, time(), note.data])
+		data = self.strip_dbus_types(note.data)
+		return chr(self.protocol_version) + self.dumps([self.hostname, time(), data])
 
 	def decode(self, msg):
 		if ord(msg[0]) > self.protocol_version: return
@@ -126,7 +138,7 @@ class PubSub(object):
 		assert isinstance(note, Notification), note
 		msg = self.encode(note)
 		# pub shouldn't block, but just to be safe
-		try: self.pub.send(msg, self.zmq.NOBLOCK)
+		try: self.pub.send(msg, self.zmq.DONTWAIT)
 		except self.zmq.ZMQError as err:
 			if err.errno != self.zmq.EAGAIN: raise
 
@@ -135,7 +147,7 @@ class PubSub(object):
 			peers, if available, otherwise None is returned.'''
 		msg = None
 		while not msg:
-			try: msg = self.sub.recv(self.zmq.NOBLOCK)
+			try: msg = self.sub.recv(self.zmq.DONTWAIT)
 			except self.zmq.ZMQError as err:
 				if err.errno != self.zmq.EAGAIN: raise
 				return
