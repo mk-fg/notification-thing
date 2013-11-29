@@ -7,7 +7,7 @@ from time import time
 from collections import Mapping
 from dbus.mainloop.glib import DBusGMainLoop
 import dbus, dbus.service
-import os, sys, traceback, types
+import os, sys, traceback, types, math
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -47,7 +47,7 @@ def flatten_dict(data, path=tuple()):
 		else: dst.append((k, v))
 	return dst
 
-def ts_diff_format( seconds,
+def ts_diff_format( seconds, add_ago=False,
 		_units_days=dict(y=365.25, mo=30.5, w=7, d=0),
 		_units_s=dict(h=3600, m=60, s=0) ):
 	days = seconds // (24*3600)
@@ -72,7 +72,9 @@ def ts_diff_format( seconds,
 				s = seconds % unit_s
 
 	if not res: return 'just now'
-	else: return ' '.join(res)
+	else:
+		if add_ago: res.append('ago')
+		return ' '.join(res)
 
 
 
@@ -403,7 +405,14 @@ class NotificationMethods(object):
 			note = note_or_summary
 		else:
 			note = core.Notification.system_message(note_or_summary, body)
-		if not redisplay: self._note_history.append(note.clone())
+
+		if not redisplay:
+			clone = note.clone()
+			clone.display_time = time()
+			self._note_history.append(clone)
+		else:
+			ts = getattr(note, 'display_time', None)
+			if ts: note.body += '\n\n[from {}]'.format(ts_diff_format(time() - ts, add_ago=True))
 
 		if note.replaces_id in self._note_windows:
 			self.close(note.replaces_id, close_reasons.closed)
