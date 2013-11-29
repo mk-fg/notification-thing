@@ -103,6 +103,14 @@ class NotificationMethods(object):
 			GObject.io_add_watch( pubsub.fileno(),
 				GObject.IO_IN | GObject.IO_PRI, self._notify_pubsub )
 
+		if optz.test_message:
+			self.display( 'Notification daemon started',
+				( 'Desktop notification daemon started successfully on host:'
+					' {host}\nCode path: {code}\nPubSub enabled: {pubsub}' )\
+				.format( host=os.uname()[1],
+					pubsub=unicode(bool(pubsub)).lower(),
+					code=os.path.abspath(os.path.dirname(core.__file__)) ) )
+
 
 	def exit(self, reason=None):
 		log.debug('Exiting cleanly{}'.format(', reason: {}'.format(reason) if reason else ''))
@@ -544,7 +552,9 @@ def main(argv=None):
 			' (less or equal zero - infinite, default: %(default)ss)')
 	parser.add_argument('--no-status-notify',
 		action='store_false', dest='status_notify', default=True,
-		help='Do not send notification on changes in proxy settings.')
+		help='Do not send notification on changes in daemon settings.')
+	parser.add_argument('--test-message', action='store_true',
+		help='Issue test notification right after start.')
 
 	parser.add_argument('--filter-file', default='~/.notification_filter', metavar='PATH',
 		help='Read simple scheme rules for filtering notifications from file (default: %(default)s).')
