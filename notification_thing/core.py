@@ -48,6 +48,8 @@ class Notification(MutableMapping):
 
 	data = created = None
 
+	init_args = 'summary', 'body', 'timeout', 'icon',\
+		'app_name', 'replaces_id', 'actions', 'hints'
 	dbus_args = 'app_name', 'replaces_id', 'icon',\
 		'summary', 'body', 'actions', 'hints', 'timeout'
 	default_timeout = optz['popup_timeout']
@@ -68,9 +70,7 @@ class Notification(MutableMapping):
 		self.created = time()
 		if timeout == -1: timeout = self.default_timeout # yes, -1 is special-case value in specs
 		elif timeout is None: timeout = -1 # to be serialized or whatever
-
-		args = 'summary', 'body', 'timeout', 'icon', 'app_name', 'replaces_id', 'actions', 'hints'
-		self.data = dict(it.izip(args, op.itemgetter(*args)(locals())))
+		self.data = dict(it.izip(self.init_args, op.itemgetter(*self.init_args)(locals())))
 
 	def __iter__(self):
 		return iter(op.itemgetter(*self.dbus_args)(self.data))
@@ -78,7 +78,7 @@ class Notification(MutableMapping):
 		if not k.startswith('__'): return self.data[k]
 		else: raise AttributeError
 	def __setattr__(self, k, v):
-		if hasattr(self, k) or k not in self.data: self.__dict__[k] = v
+		if not self.data or k not in self.data: self.__dict__[k] = v
 		else: self.data[k] = v
 
 	def __len__(self): return len(self.data)
