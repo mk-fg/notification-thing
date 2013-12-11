@@ -37,7 +37,9 @@ def parse_pango_markup(text):
 	success = True
 	try: _, attr_list, text, _ = Pango.parse_markup(text, -1, '\0')
 	except GLib.GError as err:
-		log.warn('Pango formatting failed ({}) for message, stripping markup: {!r}'.format(err, text))
+		if 'Pango formatting failed' not in text: # avoid possible feedback loops
+			log.warn(( 'Pango formatting failed ({})'
+				' for message, stripping markup: {!r}' ).format(err, text))
 		_, attr_list, text, _ = Pango.parse_markup(strip_markup(text), -1, '\0')
 		success = False
 	return success, text, attr_list
