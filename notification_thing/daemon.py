@@ -95,7 +95,8 @@ class NotificationMethods(object):
 			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
 		self._renderer = NotificationDisplay(
 			optz.layout_margin, optz.layout_anchor,
-			optz.layout_direction, optz.icon_width, optz.icon_height )
+			optz.layout_direction, optz.icon_width, optz.icon_height,
+			disable_markup=optz.disable_markup )
 		self._activity_event()
 
 		self.pubsub = pubsub
@@ -104,10 +105,13 @@ class NotificationMethods(object):
 				GObject.IO_IN | GObject.IO_PRI, self._notify_pubsub )
 
 		if optz.test_message:
-			self.display( 'Notification daemon started',
-				( 'Desktop notification daemon started successfully on host:'
-					' {host}\nCode path: {code}\nPubSub enabled: {pubsub}' )\
+			# Also test crazy web-of-90s markup here :P
+			self.display( 'Notification daemon started <small><tt>¯\(°_o)/¯</tt></small>',
+				( 'Desktop notification daemon started successfully on host: <u>{host}</u>'
+					'\nCode path: <small>{code}</small>'
+					'\nPubSub enabled: <span color="{pubsub_color}">{pubsub}</span>' )\
 				.format( host=os.uname()[1],
+					pubsub_color='green' if pubsub else 'red',
 					pubsub=unicode(bool(pubsub)).lower(),
 					code=os.path.abspath(os.path.dirname(core.__file__)) ) )
 
@@ -138,7 +142,9 @@ class NotificationMethods(object):
 		# action-icons, actions, body, body-hyperlinks, body-images,
 		#  body-markup, icon-multi, icon-static, persistence, sound
 		self._activity_event()
-		return ['body', 'persistence', 'icon-static']
+		caps = ['body', 'persistence', 'icon-static']
+		if not self._renderer.disable_markup: caps.append('body-markup')
+		return sorted(caps)
 
 	def NotificationClosed(self, nid, reason=None):
 		log.debug(
@@ -582,6 +588,10 @@ def main(argv=None):
 		help='Scale icon (preserving aspect ratio) to width.')
 	parser.add_argument('--icon-height', '--img-h', type=int, metavar='px',
 		help='Scale icon (preserving aspect ratio) to height.')
+	parser.add_argument('--disable-markup', action='store_true',
+		help='Disable pango markup (tags, somewhat similar to html) processing.'
+			' These are either rendered by pango or stripped (if pango fails to parse them) by default.'
+			' See "Appearance / styles" section of the README for more details.')
 
 	parser.add_argument('--tbf-size', type=int, default=optz['tbf_size'],
 		help='Token-bucket message-flow filter (tbf) bucket size (default: %(default)s)')

@@ -2,7 +2,8 @@
 from __future__ import unicode_literals, print_function
 
 import itertools as it, operator as op, functools as ft
-from collections import OrderedDict, namedtuple
+from collections import OrderedDict, namedtuple, defaultdict
+import sgmllib, htmlentitydefs
 import os, urllib, re, types
 
 import gi
@@ -13,6 +14,83 @@ from .core import urgency_levels
 
 import logging
 log = logging.getLogger(__name__)
+
+
+class MarkupToText(sgmllib.SGMLParser):
+	# Taken from some eff-bot code on c.l.p.
+
+	entitydefs = htmlentitydefs.entitydefs.copy()
+	sub, entitydefs['nbsp'] = '', ' '
+
+	def unknown_starttag(self, tag, attr): self.d.append(self.sub)
+	def unknown_endtag(self, tag): self.d.append(self.sub)
+	def handle_data(self, data): self.d.append(data)
+
+	def __call__(self, s):
+		self.d = list()
+		self.feed(s)
+		return ''.join(self.d).strip()
+
+strip_markup = MarkupToText()
+
+def parse_pango_markup(text):
+	success = True
+	try: _, attr_list, text, _ = Pango.parse_markup(text, -1, '\0')
+	except GLib.GError as err:
+		log.warn('Pango formatting failed ({}) for message, stripping markup: {!r}'.format(err, text))
+		_, attr_list, text, _ = Pango.parse_markup(strip_markup(text), -1, '\0')
+		success = False
+	return success, text, attr_list
+
+def pango_markup_to_gtk( text,
+		_pango_classes={
+			'SIZE': Pango.AttrInt,
+			'WEIGHT': Pango.AttrInt,
+			'UNDERLINE': Pango.AttrInt,
+			'STRETCH': Pango.AttrInt,
+			'VARIANT': Pango.AttrInt,
+			'STYLE': Pango.AttrInt,
+			'SCALE': Pango.AttrFloat,
+			'FAMILY': Pango.AttrString,
+			'FONT_DESC': Pango.AttrFontDesc,
+			'STRIKETHROUGH': Pango.AttrInt,
+			'BACKGROUND': Pango.AttrColor,
+			'FOREGROUND': Pango.AttrColor,
+			'RISE': Pango.AttrInt },
+		_pango_to_gtk={'font_desc': 'font'} ):
+	# See https://bugzilla.gnome.org/show_bug.cgi?id=59390 for why it is necessary
+	# And doesn't work with GI anyway because of
+	#  https://bugzilla.gnome.org/show_bug.cgi?id=646788
+	#  "Behdad Esfahbod [pango developer]: I personally have no clue how to fix this"
+	# Workaround from https://github.com/matasbbb/pitivit/commit/da815339e
+	# TODO: fix when AttrList.get_iterator will be accessible via GI or textbuffer gets set_markup()
+	_, text, attr_list = parse_pango_markup(text)
+
+	gtk_tags = defaultdict(dict)
+	def parse_attr(attr, _data):
+		gtk_attr = attr.klass.type.value_nick
+		if gtk_attr in _pango_to_gtk: gtk_attr = _pango_to_gtk[gtk_attr]
+		pango_attr, span = attr.klass.type.value_name, (attr.start_index, attr.end_index)
+		assert pango_attr.startswith('PANGO_ATTR_'), pango_attr
+		attr.__class__ = _pango_classes[pango_attr[11:]] # allows to access attr.value
+		for k in 'value', 'ink_rect', 'logical_rect', 'desc', 'color':
+			if not hasattr(attr, k): continue
+			val = getattr(attr, k)
+			if k == 'color':
+				val = '#' + ''.join('{:02x}'.format(v/256) for v in [val.red, val.green, val.blue])
+			gtk_tags[span][gtk_attr] = val
+			break
+		else:
+			raise KeyError('Failed to extract value for pango attribute: {}'.format(pango_attr))
+		return False
+	attr_list.filter(parse_attr, None)
+
+	pos = 0
+	for (a, b), props in sorted(gtk_tags.viewitems()):
+		if a > pos: yield (text[pos:a], None)
+		yield (text[a:b], props)
+		pos = b
+	if text[pos:]: yield (text[pos:], None)
 
 
 class NotificationDisplay(object):
@@ -39,7 +117,8 @@ class NotificationDisplay(object):
 	base_css_min = b'#notification * { font-size: 8; }' # simpliest fallback
 
 	def __init__( self, layout_margin,
-			layout_anchor, layout_direction, icon_width, icon_height ):
+			layout_anchor, layout_direction, icon_width, icon_height,
+			disable_markup=False ):
 		self.margins = dict(it.chain.from_iterable(map(
 			lambda ax: ( (2**ax, layout_margin),
 				(-2**ax, layout_margin) ), xrange(2) )))
@@ -48,6 +127,7 @@ class NotificationDisplay(object):
 		self.layout_direction = layout_direction
 		self.icon_width = icon_width
 		self.icon_height = icon_height
+		self.disable_markup = disable_markup
 
 		self._windows = OrderedDict()
 
@@ -161,7 +241,15 @@ class NotificationDisplay(object):
 			ev_boxes.append(h_box)
 		else: frame.add(v_box)
 
-		widget_summary = Gtk.Label(name='summary', label=summary)
+		widget_summary = Gtk.Label(name='summary')
+
+		if self.disable_markup: widget_summary.set_text(summary)
+		else:
+			# Sanitize tags through pango first, so set_markup won't produce empty label
+			success, text, _ = parse_pango_markup(summary)
+			if success: text = summary
+			widget_summary.set_markup(text)
+
 		widget_summary.set_alignment(0, 0)
 		if urgency_label:
 			summary_box = Gtk.EventBox(name=urgency_label)
@@ -173,9 +261,25 @@ class NotificationDisplay(object):
 		v_box.pack_start(Gtk.HSeparator(name='hs'), False, False, 0)
 
 		widget_body = Gtk.TextView( name='body',
-			wrap_mode=Gtk.WrapMode.WORD_CHAR )
+			wrap_mode=Gtk.WrapMode.WORD_CHAR,
+			cursor_visible=False, editable=False )
 		widget_body_buffer = widget_body.get_buffer()
-		widget_body_buffer.set_text(body)
+
+		if self.disable_markup: widget_body_buffer.set_text(body)
+		else:
+			# This buffer uses pango markup, even though GtkTextView does not support it
+			# Most magic is in pango_markup_to_gtk(), there doesn't seem to be any cleaner way
+			def get_tag(props, _tag_id=iter(xrange(2**31-1)), _tag_table=dict()):
+				k = tuple(sorted(props.viewitems()))
+				if k not in _tag_table:
+					_tag_table[k] = widget_body_buffer\
+						.create_tag('x{}'.format(next(_tag_id)), **props)
+				return _tag_table[k]
+			pos = widget_body_buffer.get_end_iter()
+			for text, props in pango_markup_to_gtk(body):
+				if props: widget_body_buffer.insert_with_tags(pos, text, get_tag(props))
+				else: widget_body_buffer.insert(pos, text)
+
 		v_box.pack_start(widget_body, False, False, 0)
 		ev_boxes.append(widget_body)
 

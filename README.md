@@ -220,6 +220,11 @@ up-to-date stylesheet though):
 	}
 	#notification #body { font-size: 8px; }
 
+[Pango markup](https://developer.gnome.org/pango/stable/PangoMarkupFormat.html)
+both in message body and summary is supported, but *stripped* if pango fails to
+parse it, so make sure to properly xml-escape passed stuff or use
+--disable-markup option to force displaying stuff as-is.
+
 
 ##### Network broadcasting
 
