@@ -18,12 +18,10 @@ log = logging.getLogger(__name__)
 
 class MarkupToText(sgmllib.SGMLParser):
 	# Taken from some eff-bot code on c.l.p.
-
-	entitydefs = htmlentitydefs.entitydefs.copy()
-	sub, entitydefs['nbsp'] = '', ' '
-
+	sub, entitydefs = '', dict()
 	def unknown_starttag(self, tag, attr): self.d.append(self.sub)
 	def unknown_endtag(self, tag): self.d.append(self.sub)
+	def unknown_entityref(self, ref): self.d.extend(['&', ref, ';'])
 	def handle_data(self, data): self.d.append(data)
 
 	def __call__(self, s):
