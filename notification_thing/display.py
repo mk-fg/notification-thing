@@ -3,6 +3,7 @@ from __future__ import unicode_literals, print_function
 
 import itertools as it, operator as op, functools as ft
 from collections import OrderedDict, namedtuple, defaultdict
+from xml.sax.saxutils import escape as xml_escape
 import sgmllib, htmlentitydefs
 import os, urllib, re, types
 
@@ -31,13 +32,14 @@ class MarkupToText(sgmllib.SGMLParser):
 
 strip_markup = MarkupToText()
 
-def parse_pango_markup(text):
+def parse_pango_markup(text, _err_mark='[TN82u8] '):
 	success = True
 	try: _, attr_list, text, _ = Pango.parse_markup(text, -1, '\0')
 	except GLib.GError as err:
-		if 'Pango formatting failed' not in text: # avoid possible feedback loops
-			log.warn(( 'Pango formatting failed ({})'
-				' for message, stripping markup: {!r}' ).format(err, text))
+		msg_start = '{}Pango formatting failed'.format(_err_mark)
+		if msg_start not in text: # detect and avoid possible feedback loops
+			log.warn('{} ({}) for text, stripping markup: {!r}'.format(msg_start, err, text))
+		else: text = xml_escape(text) # escape message so it'd render bugged part
 		_, attr_list, text, _ = Pango.parse_markup(strip_markup(text), -1, '\0')
 		success = False
 	return success, text, attr_list
