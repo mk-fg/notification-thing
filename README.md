@@ -225,6 +225,14 @@ both in message body and summary is supported, but *stripped* if pango fails to
 parse it, so make sure to properly xml-escape passed stuff or use
 --disable-markup option to force displaying stuff as-is.
 
+Technically GtkTextView widget used for message body doesn't allow pango markup
+(though GtkLabel holding summary does, see also
+[gnome bug 59390](https://bugzilla.gnome.org/show_bug.cgi?id=59390)) and uses it's own
+[GtkTextTag](https://developer.gnome.org/gtk3/unstable/GtkTextTag.html)-based markup,
+which is very similar to pango, so pango stuff gets ad-hoc converted to
+GtkTextTags (see `display.pango_markup_to_gtk`), and potentially (but unlikely)
+can get something wrong.
+
 
 ##### Network broadcasting
 
