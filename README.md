@@ -220,10 +220,19 @@ up-to-date stylesheet though):
 	}
 	#notification #body { font-size: 8px; }
 
+
+##### Markup
+
 [Pango markup](https://developer.gnome.org/pango/stable/PangoMarkupFormat.html)
-both in message body and summary is supported, but *stripped* if pango fails to
-parse it, so make sure to properly xml-escape passed stuff or use
---disable-markup option to force displaying stuff as-is.
+both in message body and summary is supported and processing of it is enabled by
+default (can be disabled with --markup-disable).
+
+Whether it should be parsed can also be controlled on per-message basis by
+passing boolean "x-nt-markup" hint (true - enabled, false - disabled).
+
+Other --markup-* options are available to control what happens when pango fails
+to parse the tags in text - whether it should be stripped (--markup-strip-on-err
+option) and/or warning should be issued.
 
 Technically GtkTextView widget used for message body doesn't allow pango markup
 (though GtkLabel holding summary does, see also

@@ -32,68 +32,6 @@ class MarkupToText(sgmllib.SGMLParser):
 
 strip_markup = MarkupToText()
 
-def parse_pango_markup(text, _err_mark='[TN82u8] '):
-	success = True
-	try: _, attr_list, text, _ = Pango.parse_markup(text, -1, '\0')
-	except GLib.GError as err:
-		msg_start = '{}Pango formatting failed'.format(_err_mark)
-		if msg_start not in text: # detect and avoid possible feedback loops
-			log.warn('{} ({}) for text, stripping markup: {!r}'.format(msg_start, err, text))
-		else: text = xml_escape(text) # escape message so it'd render bugged part
-		_, attr_list, text, _ = Pango.parse_markup(strip_markup(text), -1, '\0')
-		success = False
-	return success, text, attr_list
-
-def pango_markup_to_gtk( text,
-		_pango_classes={
-			'SIZE': Pango.AttrInt,
-			'WEIGHT': Pango.AttrInt,
-			'UNDERLINE': Pango.AttrInt,
-			'STRETCH': Pango.AttrInt,
-			'VARIANT': Pango.AttrInt,
-			'STYLE': Pango.AttrInt,
-			'SCALE': Pango.AttrFloat,
-			'FAMILY': Pango.AttrString,
-			'FONT_DESC': Pango.AttrFontDesc,
-			'STRIKETHROUGH': Pango.AttrInt,
-			'BACKGROUND': Pango.AttrColor,
-			'FOREGROUND': Pango.AttrColor,
-			'RISE': Pango.AttrInt },
-		_pango_to_gtk={'font_desc': 'font'} ):
-	# See https://bugzilla.gnome.org/show_bug.cgi?id=59390 for why it is necessary
-	# And doesn't work with GI anyway because of
-	#  https://bugzilla.gnome.org/show_bug.cgi?id=646788
-	#  "Behdad Esfahbod [pango developer]: I personally have no clue how to fix this"
-	# Workaround from https://github.com/matasbbb/pitivit/commit/da815339e
-	# TODO: fix when AttrList.get_iterator will be accessible via GI or textbuffer gets set_markup()
-	_, text, attr_list = parse_pango_markup(text)
-
-	gtk_tags = defaultdict(dict)
-	def parse_attr(attr, _data):
-		gtk_attr = attr.klass.type.value_nick
-		if gtk_attr in _pango_to_gtk: gtk_attr = _pango_to_gtk[gtk_attr]
-		pango_attr, span = attr.klass.type.value_name, (attr.start_index, attr.end_index)
-		assert pango_attr.startswith('PANGO_ATTR_'), pango_attr
-		attr.__class__ = _pango_classes[pango_attr[11:]] # allows to access attr.value
-		for k in 'value', 'ink_rect', 'logical_rect', 'desc', 'color':
-			if not hasattr(attr, k): continue
-			val = getattr(attr, k)
-			if k == 'color':
-				val = '#' + ''.join('{:02x}'.format(v/256) for v in [val.red, val.green, val.blue])
-			gtk_tags[span][gtk_attr] = val
-			break
-		else:
-			raise KeyError('Failed to extract value for pango attribute: {}'.format(pango_attr))
-		return False
-	attr_list.filter(parse_attr, None)
-
-	pos = 0
-	for (a, b), props in sorted(gtk_tags.viewitems()):
-		if a > pos: yield (text[pos:a], None)
-		yield (text[a:b], props)
-		pos = b
-	if text[pos:]: yield (text[pos:], None)
-
 
 class NotificationDisplay(object):
 	'''Interface to display notification stack.
@@ -118,9 +56,10 @@ class NotificationDisplay(object):
 		#notification #body { font-size: 8px; }'''
 	base_css_min = b'#notification * { font-size: 8; }' # simpliest fallback
 
+
 	def __init__( self, layout_margin,
 			layout_anchor, layout_direction, icon_width, icon_height,
-			disable_markup=False ):
+			markup_default=False, markup_warn=False, markup_strip=False ):
 		self.margins = dict(it.chain.from_iterable(map(
 			lambda ax: ( (2**ax, layout_margin),
 				(-2**ax, layout_margin) ), xrange(2) )))
@@ -129,7 +68,8 @@ class NotificationDisplay(object):
 		self.layout_direction = layout_direction
 		self.icon_width = icon_width
 		self.icon_height = icon_height
-		self.disable_markup = disable_markup
+		self.markup_default = markup_default
+		self.markup_warn, self.markup_strip = markup_warn, markup_strip
 
 		self._windows = OrderedDict()
 
@@ -137,6 +77,76 @@ class NotificationDisplay(object):
 		Gtk.StyleContext.add_provider_for_screen(
 			Gdk.Screen.get_default(), self._default_style,
 			Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION )
+
+
+	def _pango_markup_parse(self, text, _err_mark='[TN82u8] '):
+		success = True
+		try: _, attr_list, text, _ = Pango.parse_markup(text, -1, '\0')
+		except GLib.GError as err:
+			if self.markup_warn:
+				msg_start = '{}Pango formatting failed'.format(_err_mark)
+				if msg_start not in text: # detect and avoid possible feedback loops
+					log.warn('{} ({}) for text, stripping markup: {!r}'.format(msg_start, err, text))
+				else: text = xml_escape(text) # escape message so it'd render bugged part
+			if self.markup_strip: text = strip_markup(text)
+			try: _, attr_list, text, _ = Pango.parse_markup(text, -1, '\0')
+			except GLib.GError: attr_list = None
+			success = False
+		return success, text, attr_list
+
+	def _pango_markup_to_gtk( self, text,
+			_pango_classes={
+				'SIZE': Pango.AttrInt,
+				'WEIGHT': Pango.AttrInt,
+				'UNDERLINE': Pango.AttrInt,
+				'STRETCH': Pango.AttrInt,
+				'VARIANT': Pango.AttrInt,
+				'STYLE': Pango.AttrInt,
+				'SCALE': Pango.AttrFloat,
+				'FAMILY': Pango.AttrString,
+				'FONT_DESC': Pango.AttrFontDesc,
+				'STRIKETHROUGH': Pango.AttrInt,
+				'BACKGROUND': Pango.AttrColor,
+				'FOREGROUND': Pango.AttrColor,
+				'RISE': Pango.AttrInt },
+			_pango_to_gtk={'font_desc': 'font'} ):
+		# See https://bugzilla.gnome.org/show_bug.cgi?id=59390 for why it is necessary
+		# And doesn't work with GI anyway because of
+		#  https://bugzilla.gnome.org/show_bug.cgi?id=646788
+		#  "Behdad Esfahbod [pango developer]: I personally have no clue how to fix this"
+		# Workaround from https://github.com/matasbbb/pitivit/commit/da815339e
+		# TODO: fix when AttrList.get_iterator will be accessible via GI or textbuffer gets set_markup()
+		_, text, attr_list = self._pango_markup_parse(text)
+		if attr_list is None:
+			yield (text, None)
+			raise StopIteration
+
+		gtk_tags = defaultdict(dict)
+		def parse_attr(attr, _data):
+			gtk_attr = attr.klass.type.value_nick
+			if gtk_attr in _pango_to_gtk: gtk_attr = _pango_to_gtk[gtk_attr]
+			pango_attr, span = attr.klass.type.value_name, (attr.start_index, attr.end_index)
+			assert pango_attr.startswith('PANGO_ATTR_'), pango_attr
+			attr.__class__ = _pango_classes[pango_attr[11:]] # allows to access attr.value
+			for k in 'value', 'ink_rect', 'logical_rect', 'desc', 'color':
+				if not hasattr(attr, k): continue
+				val = getattr(attr, k)
+				if k == 'color':
+					val = '#' + ''.join('{:02x}'.format(v/256) for v in [val.red, val.green, val.blue])
+				gtk_tags[span][gtk_attr] = val
+				break
+			else:
+				raise KeyError('Failed to extract value for pango attribute: {}'.format(pango_attr))
+			return False
+		attr_list.filter(parse_attr, None)
+
+		pos = 0
+		for (a, b), props in sorted(gtk_tags.viewitems()):
+			if a > pos: yield (text[pos:a], None)
+			yield (text[a:b], props)
+			pos = b
+		if text[pos:]: yield (text[pos:], None)
+
 
 	def _get_default_css(self):
 		css, base_css = Gtk.CssProvider(), self.base_css
@@ -158,6 +168,7 @@ class NotificationDisplay(object):
 			else: break # don't load any css
 		return css
 
+
 	def _update_layout(self):
 		# Get the coordinates of the "anchor" corner (screen corner +/- margins)
 		base = tuple(map(
@@ -174,6 +185,7 @@ class NotificationDisplay(object):
 				lambda ax: base[ax] if self.layout_direction != ax else\
 					base[ax] + (margin + win.get_size()[ax])\
 						* (2 * (2**ax ^ (2**ax & self.layout_anchor)) / 2**ax - 1), xrange(2) ))
+
 
 	def _get_icon(self, icon):
 		widget_icon = None
@@ -218,9 +230,10 @@ class NotificationDisplay(object):
 
 		return widget_icon
 
-	def _create_win(self, summary, body, icon=None, urgency_label=None):
+
+	def _create_win(self, summary, body, icon=None, urgency_label=None, markup=False):
 		log.debug( 'Creating window with parameters: {}'\
-			.format(', '.join(map(unicode, [summary, repr(body), icon, urgency_label]))) )
+			.format(dict(summary=summary, body=body, icon=icon, urgency=urgency_label, markup=markup)) )
 
 		win = Gtk.Window(name='notification', type=Gtk.WindowType.POPUP)
 		win.set_default_size(400, 20)
@@ -245,12 +258,12 @@ class NotificationDisplay(object):
 
 		widget_summary = Gtk.Label(name='summary')
 
-		if self.disable_markup: widget_summary.set_text(summary)
+		if not markup: widget_summary.set_text(summary)
 		else:
 			# Sanitize tags through pango first, so set_markup won't produce empty label
-			success, text, _ = parse_pango_markup(summary)
-			if success: text = summary
-			widget_summary.set_markup(text)
+			success, text, _ = self._pango_markup_parse(summary)
+			if success: widget_summary.set_markup(summary)
+			else: widget_summary.set_text(text)
 
 		widget_summary.set_alignment(0, 0)
 		if urgency_label:
@@ -267,7 +280,7 @@ class NotificationDisplay(object):
 			cursor_visible=False, editable=False )
 		widget_body_buffer = widget_body.get_buffer()
 
-		if self.disable_markup: widget_body_buffer.set_text(body)
+		if not markup: widget_body_buffer.set_text(body)
 		else:
 			# This buffer uses pango markup, even though GtkTextView does not support it
 			# Most magic is in pango_markup_to_gtk(), there doesn't seem to be any cleaner way
@@ -278,7 +291,7 @@ class NotificationDisplay(object):
 						.create_tag('x{}'.format(next(_tag_id)), **props)
 				return _tag_table[k]
 			pos = widget_body_buffer.get_end_iter()
-			for text, props in pango_markup_to_gtk(body):
+			for text, props in self._pango_markup_to_gtk(body):
 				if props: widget_body_buffer.insert_with_tags(pos, text, get_tag(props))
 				else: widget_body_buffer.insert(pos, text)
 
@@ -316,7 +329,10 @@ class NotificationDisplay(object):
 
 			urgency = note.hints.get('urgency')
 			if urgency is not None: urgency = urgency_levels.by_id(int(urgency))
-			win = self._create_win(note.summary, note.body, image, urgency)
+			markup = note.hints.get('x-nt-markup', self.markup_default)
+
+			win = self._create_win(note.summary, note.body, image, urgency, markup=markup)
+
 			for eb in win.event_boxes:
 				eb.add_events(
 					Gdk.EventMask.BUTTON_PRESS_MASK

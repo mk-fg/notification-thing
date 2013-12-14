@@ -24,7 +24,7 @@ if __name__ == '__main__':
 	from os.path import join, realpath, dirname
 	module_root = realpath(dirname(dirname(__file__)))
 	if module_root not in sys.path: sys.path.insert(0, module_root)
-	from notification_thing.display import NotificationDisplay
+	from notification_thing.display import NotificationDisplay, strip_markup
 	from notification_thing.pubsub import PubSub
 	from notification_thing import core
 
@@ -96,7 +96,8 @@ class NotificationMethods(object):
 		self._renderer = NotificationDisplay(
 			optz.layout_margin, optz.layout_anchor,
 			optz.layout_direction, optz.icon_width, optz.icon_height,
-			disable_markup=optz.disable_markup )
+			markup_default=not optz.markup_disable,
+			markup_warn=optz.markup_warn_on_err, markup_strip=optz.markup_strip_on_err )
 		self._activity_event()
 
 		self.pubsub = pubsub
@@ -106,14 +107,17 @@ class NotificationMethods(object):
 
 		if optz.test_message:
 			# Also test crazy web-of-90s markup here :P
-			self.display( 'Notification daemon started <small><tt>¯\(°_o)/¯</tt></small>',
-				( 'Desktop notification daemon started successfully on host: <u>{host}</u>'
+			summary = 'Notification daemon started <small><tt>¯\(°_o)/¯</tt></small>'
+			body = ( 'Desktop notification daemon started successfully on host: <u>{host}</u>'
 					'\nCode path: <small>{code}</small>'
 					'\nPubSub enabled: <span color="{pubsub_color}">{pubsub}</span>' )\
 				.format( host=os.uname()[1],
 					pubsub_color='green' if pubsub else 'red',
 					pubsub=unicode(bool(pubsub)).lower(),
-					code=os.path.abspath(os.path.dirname(core.__file__)) ) )
+					code=os.path.abspath(os.path.dirname(core.__file__)) )
+			if not self._renderer.markup_default:
+				summary, body = it.imap(strip_markup, [summary, body])
+			self.display(summary, body)
 
 
 	def exit(self, reason=None):
@@ -143,7 +147,7 @@ class NotificationMethods(object):
 		#  body-markup, icon-multi, icon-static, persistence, sound
 		self._activity_event()
 		caps = ['body', 'persistence', 'icon-static']
-		if not self._renderer.disable_markup: caps.append('body-markup')
+		if not self._renderer.markup_default: caps.append('body-markup')
 		return sorted(caps)
 
 	def NotificationClosed(self, nid, reason=None):
@@ -588,10 +592,20 @@ def main(argv=None):
 		help='Scale icon (preserving aspect ratio) to width.')
 	parser.add_argument('--icon-height', '--img-h', type=int, metavar='px',
 		help='Scale icon (preserving aspect ratio) to height.')
-	parser.add_argument('--disable-markup', action='store_true',
-		help='Disable pango markup (tags, somewhat similar to html) processing.'
-			' These are either rendered by pango or stripped (if pango fails to parse them) by default.'
-			' See "Appearance / styles" section of the README for more details.')
+
+	parser.add_argument('--markup-disable', action='store_true',
+		help='Enable pango markup (tags, somewhat similar to html)'
+				' processing in all message summary/body parts by default.'
+			' These will either be rendered by pango'
+				' or stripped/shown-as-is (see --pango-markup-strip-on-err option), if invalid.'
+			' "x-nt-markup" bool hint can be used to'
+				' enable/disable markup on per-message basis, regardless of this option value.'
+			' See "Markup" section of the README for more details.')
+	parser.add_argument('--markup-strip-on-err', action='store_true',
+		help='Strip markup tags if pango fails to parse them'
+			' (when parsing markup is enabled) instead of rendering message with them as text.')
+	parser.add_argument('--markup-warn-on-err', action='store_true',
+		help='Issue loggin warning if passed markup tags cannot be parsed (when it is enabled).')
 
 	parser.add_argument('--tbf-size', type=int, default=optz['tbf_size'],
 		help='Token-bucket message-flow filter (tbf) bucket size (default: %(default)s)')
