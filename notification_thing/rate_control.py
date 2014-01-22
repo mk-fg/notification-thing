@@ -80,7 +80,7 @@ class FC_TokenBucket(object):
 
 	def _flow_adjust(self):
 		tc = self.tokens # logic-independent update of the bucket
-		if self._spree & FC_STARVE or tc == 0:
+		if self._spree & FC_STARVE or tc < 1:
 			if self._spree & FC_EMPTY: self._strangle()
 			self._spree = FC_EMPTY
 		else:
@@ -98,7 +98,7 @@ class FC_TokenBucket(object):
 	@property
 	def tick(self):
 		'Current time unit, adjusted by strangle/free functions'
-		return self._tick * self._tick_mul
+		return float(self._tick * self._tick_mul)
 
 	@property
 	def tokens(self):
@@ -106,8 +106,7 @@ class FC_TokenBucket(object):
 		ts = time()
 		if self._tokens < self.capacity:
 			self._tokens = min( self.capacity,
-				self._tokens + self.fill_rate *
-					(ts // self.tick - self._synctime // self.tick) )
+				self._tokens + self.fill_rate * (ts - self._synctime) / self.tick )
 		self._synctime = ts
 		return self._tokens
 
@@ -119,11 +118,11 @@ class FC_TokenBucket(object):
 				' %s tokens requested, while max capacity is %s'%(count, self.capacity) )
 		return self.tick - time() % self.tick
 
-	def consume(self, count=1, block=False):
+	def consume(self, count=1, block=False, force=False):
 		'Take tokens from the bucket'
 		tc = self.tokens
 
-		if count <= tc: # enough tokens are available
+		if force or count <= tc: # enough tokens are available
 			self._tokens -= count
 			self._flow_adjust()
 			return True
