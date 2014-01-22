@@ -355,16 +355,13 @@ class NotificationMethods(object):
 			return 0
 
 		plug = self.plugged or (optz.fs_check and self._fullscreen_check())
-		if plug or not self._note_limit.consume():
-			# Delay notification
+		if plug or not self._note_limit.consume(): # Delay notification
 			to = self._note_limit.get_eta() if not plug else poll_interval
-			if to > 1: # no need to bother otherwise, note that it'll be an extra token ;)
-				self._note_buffer.append(note)
-				to = to + 1 # +1 is to ensure token arrival by that time
-				log.debug( 'Queueing notification. Reason: {}. Flush attempt in {}s'\
-					.format('plug or fullscreen window detected' if plug else 'notification rate limit', to) )
-				self.flush(timeout=to)
-				return 0
+			self._note_buffer.append(note)
+			log.debug( 'Queueing notification. Reason: {}. Flush attempt in {}s'\
+				.format('plug or fullscreen window detected' if plug else 'notification rate limit', to) )
+			self.flush(timeout=to)
+			return 0
 
 		if self._note_buffer:
 			self._note_buffer.append(note)
@@ -393,7 +390,7 @@ class NotificationMethods(object):
 		log.debug( 'Flushing notification buffer ({} msgs, {} dropped)'\
 			.format(len(self._note_buffer), self._note_buffer.dropped) )
 
-		self._note_limit.consume()
+		self._note_limit.consume(force=True)
 		if not force:
 			if optz.fs_check and (self.plugged or self._fullscreen_check()):
 				log.debug( '{} detected, delaying buffer flush by {}s'\
