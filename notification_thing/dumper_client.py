@@ -24,6 +24,8 @@ def main(args=None):
 			' and dump all notification messages from a remote peer.')
 	parser.add_argument('bind',
 		help='Port number or address to bind to (e.g. 1.2.3.4:5678).')
+	parser.add_argument('-j', '--json', action='store_true',
+		help='Print json-serialized messages instead of formatted readable representation.')
 	parser.add_argument('--debug', action='store_true', help='Verbose operation mode.')
 	opts = parser.parse_args(sys.argv[1:] if args is None else args)
 
@@ -31,23 +33,25 @@ def main(args=None):
 	logging.basicConfig(level=logging.DEBUG if opts.debug else logging.WARNING)
 	log = logging.getLogger()
 
-	with closing(PubSub()) as pub:
+	with closing(PubSub()) as sub:
 		if opts.bind.isdigit(): opts.bind = '[::]:{}'.format(opts.bind)
-		pub.bind_sub(opts.bind)
+		sub.bind_sub(opts.bind)
 		s = select.epoll()
-		s.register(pub.fileno(), select.POLLIN | select.POLLPRI)
+		s.register(sub.fileno(), select.POLLIN | select.POLLPRI)
 		log.debug('Entering message-dump loop')
 		while True:
 			s.poll()
 			log.debug('Poll event')
 			while True:
-				msg = pub.recv()
+				msg = sub.recv(raw=opts.json)
 				if msg is None: break
-				if msg.note.get('plain'): summary, body = msg.note.plain
-				else: summary, body = op.itemgetter('summary', 'body')(msg.note)
-				print(
-					'Message:\n  Host: {0.hostname}\n  Summary: {1}\n  Body:\n{2}\n'
-					.format(msg, summary, '\n'.join(it.imap('    {}'.format, body.split('\n')))) )
+				if not opts.json:
+					if msg.note.get('plain'): summary, body = msg.note.plain
+					else: summary, body = op.itemgetter('summary', 'body')(msg.note)
+					print(
+						'Message:\n  Host: {0.hostname}\n  Summary: {1}\n  Body:\n{2}\n'
+						.format(msg, summary, '\n'.join(it.imap('    {}'.format, body.split('\n')))) )
+				else: print(msg.strip())
 
 
 if __name__ == '__main__': sys.exit(main())

@@ -143,7 +143,7 @@ class PubSub(object):
 		except self.zmq.ZMQError as err:
 			if err.errno != self.zmq.EAGAIN: raise
 
-	def recv(self):
+	def recv(self, raw=False):
 		'''Receive message from any of the connected
 			peers, if available, otherwise None is returned.'''
 		msg = None
@@ -152,5 +152,6 @@ class PubSub(object):
 			except self.zmq.ZMQError as err:
 				if err.errno != self.zmq.EAGAIN: raise
 				return
-			msg = self.decode(msg) # can be None on protocol mismatch
-		return msg
+			msg_res = self.decode(msg) # can be None on protocol mismatch
+		if msg_res is not None and raw: msg_res = msg
+		return msg_res
