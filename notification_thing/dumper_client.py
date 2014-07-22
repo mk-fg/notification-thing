@@ -40,7 +40,6 @@ def main(args=None):
 		log.debug('Entering message-dump loop')
 		while True:
 			s.poll()
-			log.debug('Poll event')
 			while True:
 				msg = sub.recv(raw=opts.json)
 				if msg is None: break
@@ -52,5 +51,6 @@ def main(args=None):
 						.format(msg, summary, '\n'.join(it.imap('    {}'.format, body.split('\n')))) )
 				else: print(msg.strip())
 
+	log.debug('Finished')
 
 if __name__ == '__main__': sys.exit(main())

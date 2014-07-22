@@ -43,4 +43,5 @@ setup(
 
 	entry_points = dict(console_scripts=[
 		'notification-thing = notification_thing.daemon:main',
-		'notify-net = notification_thing.net_client:main' ]) )
+		'notify-net = notification_thing.net_client:main',
+		'notify-net-dump = notification_thing.dumper_client:main' ]) )
