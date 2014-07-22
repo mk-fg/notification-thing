@@ -4,7 +4,7 @@ from __future__ import unicode_literals, print_function
 import itertools as it, operator as op, functools as ft
 from collections import OrderedDict, namedtuple, defaultdict
 from xml.sax.saxutils import escape as xml_escape
-import sgmllib, htmlentitydefs
+import sgmllib
 import os, urllib, re, types
 
 import gi
@@ -94,7 +94,7 @@ class NotificationDisplay(object):
 			success = False
 		return success, text, attr_list
 
-	def _pango_markup_to_gtk( self, text,
+	def _pango_markup_to_gtk( self, text, attr_list=None,
 			_pango_classes={
 				'SIZE': Pango.AttrInt,
 				'WEIGHT': Pango.AttrInt,
@@ -116,10 +116,11 @@ class NotificationDisplay(object):
 		#  "Behdad Esfahbod [pango developer]: I personally have no clue how to fix this"
 		# Workaround from https://github.com/matasbbb/pitivit/commit/da815339e
 		# TODO: fix when AttrList.get_iterator will be accessible via GI or textbuffer gets set_markup()
-		_, text, attr_list = self._pango_markup_parse(text)
 		if attr_list is None:
-			yield (text, None)
-			raise StopIteration
+			_, text, attr_list = self._pango_markup_parse(text)
+			if attr_list is None:
+				yield (text, None)
+				raise StopIteration
 
 		gtk_tags = defaultdict(dict)
 		def parse_attr(attr, _data):
@@ -258,12 +259,11 @@ class NotificationDisplay(object):
 
 		widget_summary = Gtk.Label(name='summary')
 
-		if not markup: widget_summary.set_text(summary)
-		else:
-			# Sanitize tags through pango first, so set_markup won't produce empty label
-			success, text, _ = self._pango_markup_parse(summary)
-			if success: widget_summary.set_markup(summary)
-			else: widget_summary.set_text(text)
+		# Sanitize tags through pango first, so set_markup won't produce empty label
+		summary_markup, summary_text, summary\
+			= self.get_display_summary(summary, markup)
+		if summary_markup: widget_summary.set_markup(summary)
+		else: widget_summary.set_text(summary)
 
 		widget_summary.set_alignment(0, 0)
 		if urgency_label:
@@ -280,7 +280,8 @@ class NotificationDisplay(object):
 			cursor_visible=False, editable=False )
 		widget_body_buffer = widget_body.get_buffer()
 
-		if not markup: widget_body_buffer.set_text(body)
+		body_markup, body_text, body_attrs = self.get_display_body(body, markup)
+		if not body_markup: widget_body_buffer.set_text(body_text)
 		else:
 			# This buffer uses pango markup, even though GtkTextView does not support it
 			# Most magic is in pango_markup_to_gtk(), there doesn't seem to be any cleaner way
@@ -291,7 +292,7 @@ class NotificationDisplay(object):
 						.create_tag('x{}'.format(next(_tag_id)), **props)
 				return _tag_table[k]
 			pos = widget_body_buffer.get_end_iter()
-			for text, props in self._pango_markup_to_gtk(body):
+			for text, props in body_attrs:
 				if props: widget_body_buffer.insert_with_tags(pos, text, get_tag(props))
 				else: widget_body_buffer.insert(pos, text)
 
@@ -306,6 +307,32 @@ class NotificationDisplay(object):
 
 		win.show_all()
 		return self.window(win, ev_boxes)
+
+
+	def get_display_summary(self, summary, markup):
+		if markup:
+			success, text, _ = self._pango_markup_parse(summary)
+			if not success: markup, summary = False, text
+		else: text = summary
+		return markup, text, summary
+
+	def get_display_body(self, body, markup):
+		if markup:
+			_, text, attr_list = self._pango_markup_parse(body)
+			if attr_list is None: markup, body_attrs = False, [(text, None)]
+			else: body_attrs = self._pango_markup_to_gtk(text, attr_list)
+		else: text = body
+		return markup, text, body_attrs
+
+	def get_note_markup(self, note):
+		return note.hints.get('x-nt-markup', self.markup_default)
+
+	def get_note_text(self, note):
+		'Returns note text, stripped of all markup, if any (and if enabled).'
+		markup = self.get_note_markup(note)
+		_, summary_text, _ = self.get_display_summary(note.summary, markup)
+		_, body_text, _ = self.get_display_body(note.body, markup)
+		return summary_text, body_text
 
 
 	def display(self, note, cb_dismiss=None, cb_hover=None, cb_leave=None):
@@ -329,7 +356,7 @@ class NotificationDisplay(object):
 
 			urgency = note.hints.get('urgency')
 			if urgency is not None: urgency = urgency_levels.by_id(int(urgency))
-			markup = note.hints.get('x-nt-markup', self.markup_default)
+			markup = self.get_note_markup(note)
 
 			win = self._create_win(note.summary, note.body, image, urgency, markup=markup)
 

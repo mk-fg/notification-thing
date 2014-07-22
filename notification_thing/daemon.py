@@ -350,7 +350,8 @@ class NotificationMethods(object):
 				', tokens left: {}'.format(self._note_limit.tokens) )
 			return self.display(note)
 
-		if not self._notification_check(note.summary, note.body):
+		note_summary, note_body = self._renderer.get_note_text(note)
+		if not self._notification_check(note_summary, note_body):
 			log.debug('Dropped notification due to negative filtering result')
 			return 0
 
