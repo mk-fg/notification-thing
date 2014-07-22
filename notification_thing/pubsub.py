@@ -118,7 +118,8 @@ class PubSub(object):
 		#  (and not '1') - which messes up simple serializers like "json" module.
 		sdt = self.strip_dbus_types
 		if isinstance(data, dict): return dict((sdt(k), sdt(v)) for k,v in data.viewitems())
-		elif isinstance(data, list): return map(sdt, data)
+		elif isinstance(data, (list, tuple)): return map(sdt, data)
+		elif isinstance(data, types.NoneType): return data
 		for t in int, long, unicode, bytes, bool:
 			if isinstance(data, t): return t(data)
 		raise ValueError(( 'Failed to sanitize data type:'

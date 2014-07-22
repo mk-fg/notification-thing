@@ -284,7 +284,11 @@ class NotificationMethods(object):
 		try:
 			note = core.Notification.from_dbus(
 				app_name, nid, icon, summary, body, actions, hints, timeout )
-			if self.pubsub: self.pubsub.send(note)
+			if self.pubsub:
+				try: self._note_plaintext(note) # make sure plain version is cached
+				except Exception as err:
+					log.info('Failed to attach plain version to net message: %s', err)
+				self.pubsub.send(note)
 			if nid: self.close(nid, reason=close_reasons.closed)
 			return self.filter_display(note)
 		except Exception:
@@ -329,6 +333,14 @@ class NotificationMethods(object):
 				self.display('Notification proxy: notification filters failed', ex)
 			return True
 
+	def _note_plaintext(self, note):
+		note_plain = note.get('plain')
+		if note_plain: summary, body = note_plain
+		else:
+			summary, body = self._renderer.get_note_text(note)
+			note.plain = summary, body
+		return summary, body
+
 	def _fullscreen_check(self, jitter=5):
 		screen = Gdk.Screen.get_default()
 		win = screen.get_active_window()
@@ -350,7 +362,7 @@ class NotificationMethods(object):
 				', tokens left: {}'.format(self._note_limit.tokens) )
 			return self.display(note)
 
-		note_summary, note_body = self._renderer.get_note_text(note)
+		note_summary, note_body = self._note_plaintext(note)
 		if not self._notification_check(note_summary, note_body):
 			log.debug('Dropped notification due to negative filtering result')
 			return 0
