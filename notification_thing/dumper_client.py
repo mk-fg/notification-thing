@@ -5,7 +5,7 @@ from __future__ import unicode_literals, print_function
 import itertools as it, operator as op, functools as ft
 from contextlib import closing
 from time import sleep
-import os, sys, select
+import os, sys, select, time
 
 if __name__ == '__main__':
 	# For running from a checkout
@@ -46,9 +46,12 @@ def main(args=None):
 				if not opts.json:
 					if msg.note.get('plain'): summary, body = msg.note.plain
 					else: summary, body = op.itemgetter('summary', 'body')(msg.note)
-					print(
-						'Message:\n  Host: {0.hostname}\n  Summary: {1}\n  Body:\n{2}\n'
-						.format(msg, summary, '\n'.join(it.imap('    {}'.format, body.split('\n')))) )
+					print('Message:\n  {}\n'.format('\n  '.join([
+						'Host: {}'.format(msg.hostname),
+						'Timestamp: {}'.format(time.strftime(
+							'%Y-%m-%d %H:%M:%S', time.localtime(msg.ts) )),
+						'Summary: {}'.format(summary),
+						'Body:\n{}'.format('\n'.join(it.imap('    {}'.format, body.split('\n')))) ])))
 				else: print(msg.strip())
 
 	log.debug('Finished')
