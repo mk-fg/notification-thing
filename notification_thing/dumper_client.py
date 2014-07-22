@@ -13,7 +13,6 @@ if __name__ == '__main__':
 	module_root = realpath(dirname(dirname(__file__)))
 	if module_root not in sys.path: sys.path.insert(0, module_root)
 
-from notification_thing.core import Notification, urgency_levels
 from notification_thing.pubsub import PubSub
 
 
