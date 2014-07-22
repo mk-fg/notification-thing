@@ -86,6 +86,10 @@ class Notification(MutableMapping):
 	def __setitem__(self, k, v): self.data[k] = v
 	def __delitem__(self, k): del self.data[k]
 
+	def __repr__(self):
+		return '<Notification[{:x}] summary={!r} body={!r}>'\
+			.format(id(self), self.summary, self.body)
+
 	def clone(self): return Notification(**self.data)
 
 # As serialized for pubsub transport
