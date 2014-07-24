@@ -39,7 +39,8 @@ def main(args=None):
 		s.register(sub.fileno(), select.POLLIN | select.POLLPRI)
 		log.debug('Entering message-dump loop')
 		while True:
-			s.poll()
+			try: s.poll()
+			except KeyboardInterrupt: return
 			while True:
 				msg = sub.recv(raw=opts.json)
 				if msg is None: break
