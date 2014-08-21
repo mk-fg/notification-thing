@@ -121,7 +121,7 @@ class NotificationMethods(object):
 
 
 	def exit(self, reason=None):
-		log.debug('Exiting cleanly{}'.format(', reason: {}'.format(reason) if reason else ''))
+		log.debug('Exiting cleanly%s', ', reason: {}'.format(reason) if reason else '')
 		sys.exit()
 
 	def _activity_event(self, callback=False):
@@ -130,7 +130,7 @@ class NotificationMethods(object):
 				self.exit(reason='activity timeout ({}s)'.format(optz.activity_timeout))
 			else:
 				log.debug( 'Ignoring inacivity timeout event'
-					' due to existing windows (retry in {}s).'.format(optz.activity_timeout) )
+					' due to existing windows (retry in %ss).', optz.activity_timeout )
 				self._activity_timer = None
 		if self._activity_timer: GObject.source_remove(self._activity_timer)
 		if optz.activity_timeout and optz.activity_timeout > 0:
@@ -152,11 +152,11 @@ class NotificationMethods(object):
 
 	def NotificationClosed(self, nid, reason=None):
 		log.debug(
-			'NotificationClosed signal (id: {}, reason: {})'\
-			.format(nid, close_reasons.by_id(reason)) )
+			'NotificationClosed signal (id: %s, reason: %s)',
+			nid, close_reasons.by_id(reason) )
 
 	def ActionInvoked(self, nid, action_key):
-		log.debug('Um... some action invoked? Params: {}'.format([nid, action_key]))
+		log.debug('Um... some action invoked? Params: %s', [nid, action_key])
 
 
 	def Get(self, iface, k):
@@ -185,7 +185,7 @@ class NotificationMethods(object):
 			k = k[:-7]
 			v = not self.Get(iface, k)
 
-		log.debug('Property change: {} = {}'.format(k, v))
+		log.debug('Property change: %s = %s', k, v)
 
 		if k == 'urgent':
 			if optz.urgency_check == v: return
@@ -216,7 +216,7 @@ class NotificationMethods(object):
 		elif k == 'cleanup':
 			if self.timeout_cleanup == v: return
 			self.timeout_cleanup = v
-			log.debug('Cleanup timeout: {}'.format(self.timeout_cleanup))
+			log.debug('Cleanup timeout: %s', self.timeout_cleanup)
 			if optz.status_notify:
 				self.display( 'Notification proxy: cleanup timeout is {}'\
 					.format('enabled' if self.timeout_cleanup else 'disabled') )
@@ -229,8 +229,8 @@ class NotificationMethods(object):
 		self.PropertiesChanged(iface, {k: v}, [])
 
 	def PropertiesChanged(self, iface, props_changed, props_invalidated):
-		log.debug( 'PropertiesChanged signal: {}'\
-			.format([iface, props_changed, props_invalidated]) )
+		log.debug( 'PropertiesChanged signal: %s',
+			[iface, props_changed, props_invalidated] )
 
 
 	def Flush(self):
@@ -252,7 +252,7 @@ class NotificationMethods(object):
 
 	def Cleanup(self, timeout, max_count):
 		log.debug( 'NotificationCleanup call'
-			' (timeout={:.1f}s, max_count={})'.format(timeout, max_count) )
+			' (timeout=%.1fs, max_count=%s)', timeout, max_count )
 		self._activity_event()
 		if max_count <= 0: max_count = None
 		ts_min = time() - timeout
@@ -296,7 +296,7 @@ class NotificationMethods(object):
 			return 0
 
 	def CloseNotification(self, nid):
-		log.debug('CloseNotification call (id: {})'.format(nid))
+		log.debug('CloseNotification call (id: %s)', nid)
 		self._activity_event()
 		self.close(nid, reason=close_reasons.closed)
 
@@ -316,9 +316,9 @@ class NotificationMethods(object):
 				except:
 					ex, self._filter_callback = traceback.format_exc(), (None, 0)
 					log.debug( 'Failed to load'
-						' notification filters (from {}):\n{}'.format(optz.filter_file, ex) )
+						' notification filters (from %s):\n%s', optz.filter_file, ex )
 					if optz.status_notify:
-						self.display('Notification proxy: failed to load notification filters', ex)
+						self.display('notification-thing: failed to load notification filters', ex)
 					return True
 				else:
 					log.debug('(Re)Loaded notification filters')
@@ -328,9 +328,9 @@ class NotificationMethods(object):
 		try: return cb(summary, body)
 		except:
 			ex = traceback.format_exc()
-			log.debug('Failed to execute notification filters:\n{}'.format(ex))
+			log.debug('Failed to execute notification filters:\n%s', ex)
 			if optz.status_notify:
-				self.display('Notification proxy: notification filters failed', ex)
+				self.display('notification-thing: notification filters failed', ex)
 			return True
 
 	def _note_plaintext(self, note):
@@ -358,21 +358,20 @@ class NotificationMethods(object):
 		except (KeyError, ValueError): urgency = None
 		if optz.urgency_check and urgency == core.urgency_levels.critical:
 			self._note_limit.consume()
-			log.debug( 'Urgent message immediate passthru'
-				', tokens left: {}'.format(self._note_limit.tokens) )
+			log.debug('Urgent message immediate passthru, tokens left: %s', self._note_limit.tokens)
 			return self.display(note)
 
 		note_summary, note_body = self._note_plaintext(note)
 		if not self._notification_check(note_summary, note_body):
-			log.debug('Dropped notification due to negative filtering result')
+			log.debug('Dropped notification due to negative filtering result: %r', note_summary)
 			return 0
 
 		plug = self.plugged or (optz.fs_check and self._fullscreen_check())
 		if plug or not self._note_limit.consume(): # Delay notification
 			to = self._note_limit.get_eta() if not plug else poll_interval
 			self._note_buffer.append(note)
-			log.debug( 'Queueing notification. Reason: {}. Flush attempt in {}s'\
-				.format('plug or fullscreen window detected' if plug else 'notification rate limit', to) )
+			log.debug( 'Queueing notification. Reason: %s. Flush attempt in %ss',
+				'plug or fullscreen window detected' if plug else 'notification rate limit', to )
 			self.flush(timeout=to)
 			return 0
 
@@ -382,7 +381,7 @@ class NotificationMethods(object):
 			self.flush()
 			return 0
 		else:
-			log.debug('Token-pass, {} token(s) left'.format(self._note_limit.tokens))
+			log.debug('Token-pass, %s token(s) left', self._note_limit.tokens)
 			return self.display(note)
 
 
@@ -393,22 +392,22 @@ class NotificationMethods(object):
 			GObject.source_remove(self._flush_timer)
 			self._flush_timer = None
 		if timeout:
-			log.debug('Scheduled notification buffer flush in {}s'.format(timeout))
+			log.debug('Scheduled notification buffer flush in %ss', timeout)
 			self._flush_timer = GObject.timeout_add(int(timeout * 1000), self.flush)
 			return
 		if not self._note_buffer:
 			log.debug('Flush event with empty notification buffer')
 			return
 
-		log.debug( 'Flushing notification buffer ({} msgs, {} dropped)'\
-			.format(len(self._note_buffer), self._note_buffer.dropped) )
+		log.debug(
+			'Flushing notification buffer (%s msgs, %s dropped)',
+			len(self._note_buffer), self._note_buffer.dropped )
 
 		self._note_limit.consume(force=True)
 		if not force:
 			if optz.fs_check and (self.plugged or self._fullscreen_check()):
-				log.debug( '{} detected, delaying buffer flush by {}s'\
-					.format(( 'Fullscreen window'
-						if not self.plugged else 'Plug' ), poll_interval) )
+				log.debug( '%s detected, delaying buffer flush by %ss',
+					('Fullscreen window' if not self.plugged else 'Plug'), poll_interval )
 				self.flush(timeout=poll_interval)
 				return
 
@@ -459,8 +458,9 @@ class NotificationMethods(object):
 			note.timer_id = GObject.timeout_add(
 				note.timeout, self.close, nid, close_reasons.expired )
 
-		log.debug( 'Created notification (id: {}, timeout: {} (ms))'\
-			.format(nid, self.timeout_cleanup and note.timeout) )
+		log.debug(
+			'Created notification (id: %s, timeout: %s (ms))',
+			nid, self.timeout_cleanup and note.timeout )
 		return nid
 
 
@@ -486,8 +486,8 @@ class NotificationMethods(object):
 
 			if delay is None: # try it, even if there's no note object
 				log.debug(
-					'Closing notification(s) (id: {}, reason: {})'\
-					.format(nid, close_reasons.by_id(reason)) )
+					'Closing notification(s) (id: %s, reason: %s)',
+					nid, close_reasons.by_id(reason) )
 				try: self._renderer.close(nid)
 				except self._renderer.NoWindowError: pass # no such window
 				else: self.NotificationClosed(nid, reason)

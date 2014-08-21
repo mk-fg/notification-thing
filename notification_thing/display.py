@@ -86,7 +86,7 @@ class NotificationDisplay(object):
 			if self.markup_warn:
 				msg_start = '{}Pango formatting failed'.format(_err_mark)
 				if msg_start not in text: # detect and avoid possible feedback loops
-					log.warn('{} ({}) for text, stripping markup: {!r}'.format(msg_start, err, text))
+					log.warn('%s (%s) for text, stripping markup: %r', msg_start, err, text)
 				else: text = xml_escape(text) # escape message so it'd render bugged part
 			if self.markup_strip: text = strip_markup(text)
 			try: _, attr_list, text, _ = Pango.parse_markup(text, -1, '\0')
@@ -154,7 +154,7 @@ class NotificationDisplay(object):
 		for attempt in xrange(6):
 			try: css.load_from_data(base_css)
 			except GLib.GError as err:
-				log.warn('Failed to load default CSS style (try {}): {}'.format(attempt+1, err))
+				log.warn('Failed to load default CSS style (try %s): %s', attempt+1, err)
 				# print(base_css)
 			else: break
 			# Try to work around https://bugzilla.gnome.org/show_bug.cgi?id=678876 and similar issues
@@ -205,9 +205,9 @@ class NotificationDisplay(object):
 						widget_icon = theme.lookup_icon(
 							icon, icon_size, Gtk.IconLookupFlags.USE_BUILTIN ).load_icon()
 					else:
-						log.warn(( '"{}" seems to be neither a valid icon file nor'
+						log.warn( '"%s" seems to be neither a valid icon file nor'
 							' a name in a freedesktop.org-compliant icon theme (or your theme'
-							' doesnt have that name). Ignoring.' ).format(icon))
+							' doesnt have that name). Ignoring.', icon )
 			else:
 				widget_icon = GdkPixbuf.Pixbuf.new_from_data(
 					bytearray(icon[6]), GdkPixbuf.Colorspace.RGB, icon[3], icon[4],
@@ -233,8 +233,8 @@ class NotificationDisplay(object):
 
 
 	def _create_win(self, summary, body, icon=None, urgency_label=None, markup=False):
-		log.debug( 'Creating window with parameters: {}'\
-			.format(dict(summary=summary, body=body, icon=icon, urgency=urgency_label, markup=markup)) )
+		log.debug( 'Creating window with parameters: %s',
+			dict(summary=summary, body=body, icon=icon, urgency=urgency_label, markup=markup) )
 
 		win = Gtk.Window(name='notification', type=Gtk.WindowType.POPUP)
 		win.set_default_size(400, 20)
@@ -351,7 +351,7 @@ class NotificationDisplay(object):
 					'image-path', 'image_path', k, 'icon_data':
 				image = hints.get(k)
 				if image:
-					log.debug('Got icon image from hint: {}'.format(k))
+					log.debug('Got icon image from hint: %s', k)
 					break
 
 			urgency = note.hints.get('urgency')
