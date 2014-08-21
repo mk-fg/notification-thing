@@ -75,7 +75,9 @@ class Notification(MutableMapping):
 	def __iter__(self):
 		return iter(op.itemgetter(*self.dbus_args)(self.data))
 	def __getattr__(self, k):
-		if not k.startswith('__'): return self.data[k]
+		if not k.startswith('__'):
+			if k in self.init_args: return self.data[k]
+			return super(Notification, self).__getattr__(k)
 		else: raise AttributeError
 	def __setattr__(self, k, v):
 		if not self.data or k not in self.data: self.__dict__[k] = v
