@@ -354,17 +354,17 @@ class NotificationMethods(object):
 			or (w >= screen.get_width() - jitter and h >= screen.get_height() - jitter)
 
 	def filter_display(self, note):
+		note_summary, note_body = self._note_plaintext(note)
+		if not self._notification_check(note_summary, note_body):
+			log.debug('Dropped notification due to negative filtering result: %r', note_summary)
+			return 0
+
 		try: urgency = int(note.hints['urgency'])
 		except (KeyError, ValueError): urgency = None
 		if optz.urgency_check and urgency == core.urgency_levels.critical:
 			self._note_limit.consume()
 			log.debug('Urgent message immediate passthru, tokens left: %s', self._note_limit.tokens)
 			return self.display(note)
-
-		note_summary, note_body = self._note_plaintext(note)
-		if not self._notification_check(note_summary, note_body):
-			log.debug('Dropped notification due to negative filtering result: %r', note_summary)
-			return 0
 
 		plug = self.plugged or (optz.fs_check and self._fullscreen_check())
 		if plug or not self._note_limit.consume(): # Delay notification
