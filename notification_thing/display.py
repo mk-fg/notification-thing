@@ -200,10 +200,10 @@ class NotificationDisplay(object):
 				else:
 					# Available names: Gtk.IconTheme.get_default().list_icons(None)
 					theme = Gtk.IconTheme.get_default()
-					if theme.has_icon(icon):
-						icon_size = self.icon_width or self.icon_height or 32
-						widget_icon = theme.lookup_icon(
-							icon, icon_size, Gtk.IconLookupFlags.USE_BUILTIN ).load_icon()
+					icon_size = self.icon_width or self.icon_height or 32
+					widget_icon = theme.lookup_icon(
+						icon, icon_size, Gtk.IconLookupFlags.USE_BUILTIN )
+					if widget_icon: widget_icon = widget_icon.load_icon()
 					else:
 						log.warn( '"%s" seems to be neither a valid icon file nor'
 							' a name in a freedesktop.org-compliant icon theme (or your theme'
