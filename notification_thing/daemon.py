@@ -11,7 +11,7 @@ import os, sys, traceback, types, math
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import GObject
+from gi.repository import GLib
 
 try: from gi.repository import Gdk
 except RuntimeError as err: # less verbose errors in case X isn't running
@@ -102,8 +102,8 @@ class NotificationMethods(object):
 
 		self.pubsub = pubsub
 		if pubsub:
-			GObject.io_add_watch( pubsub.fileno(),
-				GObject.IO_IN | GObject.IO_PRI, self._notify_pubsub )
+			GLib.io_add_watch( pubsub.fileno(),
+				GLib.PRIORITY_DEFAULT, GLib.IO_IN | GLib.IO_PRI, self._notify_pubsub )
 
 		if optz.test_message:
 			# Also test crazy web-of-90s markup here :P
@@ -132,9 +132,9 @@ class NotificationMethods(object):
 				log.debug( 'Ignoring inacivity timeout event'
 					' due to existing windows (retry in %ss).', optz.activity_timeout )
 				self._activity_timer = None
-		if self._activity_timer: GObject.source_remove(self._activity_timer)
+		if self._activity_timer: GLib.source_remove(self._activity_timer)
 		if optz.activity_timeout and optz.activity_timeout > 0:
-			self._activity_timer = GObject.timeout_add_seconds(
+			self._activity_timer = GLib.timeout_add_seconds(
 				optz.activity_timeout, self._activity_event, True )
 
 
@@ -389,11 +389,11 @@ class NotificationMethods(object):
 
 	def flush(self, force=False, timeout=None):
 		if self._flush_timer:
-			GObject.source_remove(self._flush_timer)
+			GLib.source_remove(self._flush_timer)
 			self._flush_timer = None
 		if timeout:
 			log.debug('Scheduled notification buffer flush in %ss', timeout)
-			self._flush_timer = GObject.timeout_add(int(timeout * 1000), self.flush)
+			self._flush_timer = GLib.timeout_add(int(timeout * 1000), self.flush)
 			return
 		if not self._note_buffer:
 			log.debug('Flush event with empty notification buffer')
@@ -455,7 +455,7 @@ class NotificationMethods(object):
 
 		if self.timeout_cleanup and note.timeout > 0:
 			note.timer_created, note.timer_left = time(), note.timeout / 1000.0
-			note.timer_id = GObject.timeout_add(
+			note.timer_id = GLib.timeout_add(
 				note.timeout, self.close, nid, close_reasons.expired )
 
 		log.debug(
@@ -469,7 +469,7 @@ class NotificationMethods(object):
 			note = self._note_windows.get(nid, None)
 			if note:
 				if getattr(note, 'timer_id', None):
-					GObject.source_remove(note.timer_id)
+					GLib.source_remove(note.timer_id)
 
 				if delay is None: del self._note_windows[nid]
 				elif hasattr(note, 'timer_id'): # these get sent very often
@@ -479,7 +479,7 @@ class NotificationMethods(object):
 								note.timer_left - (time() - note.timer_created)
 					else:
 						note.timer_created = time()
-						note.timer_id = GObject.timeout_add(
+						note.timer_id = GLib.timeout_add(
 							int(max(note.timer_left, 1) * 1000),
 							self.close, nid, close_reasons.expired )
 					return
@@ -709,7 +709,7 @@ def main(argv=None):
 
 	daemon = notification_daemon_factory( pubsub, bus,
 		optz.dbus_path, dbus.service.BusName(optz.dbus_interface, bus) )
-	loop = GObject.MainLoop()
+	loop = GLib.MainLoop()
 	log.debug('Starting gobject loop')
 	loop.run()
 
