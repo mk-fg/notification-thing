@@ -121,8 +121,8 @@ class NotificationSounds(object):
 		self._ctx_call_props('play', play_id, props_dict)
 		return play_id
 
-	def play_sync(self, name=None, play_id=None, props_dict=None, **wait_kws):
-		play_id = self.play(name, play_id=play_id, props_dict=props_dict)
+	def play_sync(self, name_or_props=None, play_id=None, **wait_kws):
+		play_id = self.play(name_or_props, play_id=play_id)
 		self.wait(play_id, **wait_kws)
 
 	def cache(self, name_or_props):
