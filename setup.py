@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
 from setuptools import setup, find_packages
-import os
+import os, runpy
 
 pkg_root = os.path.dirname(__file__)
+__version__ = runpy.run_path(
+	os.path.join(pkg_root, 'notification_thing', '__init__.py') )['__version__']
+
 
 # Error-handling here is to allow package to be built w/o README included
 try: readme = open(os.path.join(pkg_root, 'README.md')).read()
@@ -12,7 +15,7 @@ except IOError: readme = ''
 setup(
 
 	name = 'notification-thing',
-	version = '15.03.0',
+	version = __version__,
 	author = 'Mike Kazantsev',
 	author_email = 'mk.fraggod@gmail.com',
 	license = 'WTFPL',

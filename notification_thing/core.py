@@ -8,6 +8,7 @@ import dbus, argparse, re, logging
 
 from .scheme import load, init_env
 from .rate_control import FC_TokenBucket, RRQ
+from . import __version__
 
 
 class Enum(dict):
@@ -112,12 +113,18 @@ def get_filter(path, sound_env=None):
 
 def get_sound_env():
 	assert not _scheme_init # must be initialized before scheme env
+	# XXX: pass window position and allow configuration of canberra props
 	from .sounds import NotificationSounds, NSoundError, NSoundInitError
 	log = logging.getLogger('core.sound')
 	try:
 		env = NotificationSounds()
+		env.change_props({
+			'application.id': 'net.fraggod.notification-thing',
+			'application.name': 'notification-thing',
+			'application.version': __version__,
+			'application.language': 'en_US' })
 		env.open()
-	except NSoundInitError as err:
+	except NSoundError as err:
 		log.exception('Failed to initialize sound output: %s', err)
 	else:
 		def snd(func, name):
