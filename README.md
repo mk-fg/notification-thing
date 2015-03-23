@@ -46,9 +46,9 @@ Features:
 * Can play any sounds from anywhere in the filtering scripts
   (via [libcanberra](http://0pointer.de/lennart/projects/libcanberra/)).
 
-  I.e. on specific occasions, like some regexp-match, not for every message
-  (though that is certainly possible as well), or even multiple samples for one
-  message.
+  I.e. only on specific occasions, like some regexp-match, not for every message
+  (though that is certainly possible as well), different sounds based on
+  notification message, or even multiple samples for the same one.
 
 * All options/features are configurable and can be disabled entirely, either
   from command-line or a YAML configuration file.
@@ -209,10 +209,13 @@ sound ends, and is intended for rare cases when e.g. one might want to play
 several different samples in sequence.
 
 There's also "sound-cache" function to use libcanberra's "cache" function
-(to reuse sample on the audio daemon).
+(to efficiently cache and reuse sample in audio daemon, e.g. pulseaudio).
 
-Sounds are played only when and where these functions gets invoked from the
+Sounds are played only when and where these functions get invoked from the
 filtering scripts, i.e. not played anywhere at all by default.
+
+This allows to play sound samples selectively, using different samples based on
+notification and possibly play multiple samples (in sequence or at the same time).
 
 "--no-filter-sound" cli/config option can be used to force-disable these,
 don't init/touch libcanberra at all and make sound-* into a no-op functions.
