@@ -8,6 +8,7 @@ import os, sys, ctypes, time
 
 
 class NSoundError(Exception): pass
+class NSoundInitError(NSoundError): pass
 class NSoundTimeout(NSoundError): pass
 
 class NotificationSounds(object):
@@ -59,6 +60,7 @@ class NotificationSounds(object):
 				getattr(libca, 'ca_context_{}'.format(k)).errcheck = cls._chk_int
 		return cls._lib_ca
 
+
 	@classmethod
 	def play_once(cls, *play_sync_args, **play_sync_kws):
 		with cls() as snd:
@@ -66,8 +68,11 @@ class NotificationSounds(object):
 
 
 	def __init__(self):
-		self._ctx, self._lib = self.ca_context_t(), self._get_lib()
-		self._lib.ca_context_create(ctypes.byref(self._ctx))
+		self._ctx, self._lib = self.ca_context_t(), None
+		try: self._lib = self._get_lib()
+		except OSError as err: raise NSoundInitError(*err.args)
+		try: self._lib.ca_context_create(ctypes.byref(self._ctx))
+		except NSoundError as err: raise NSoundInitError(*err.args)
 
 	def __enter__(self):
 		self.open()
@@ -94,12 +99,16 @@ class NotificationSounds(object):
 		return props
 
 
-	def open(self): self._ctx_call('open')
-	def close(self): self.destroy()
+	def open(self):
+		try: self._ctx_call('open')
+		except NSoundError as err: raise NSoundInitError(*err.args)
+
 	def destroy(self):
-		if self._ctx is not None:
+		if self._ctx and self._lib:
 			self._ctx_call('destroy')
-			self._ctx = None
+			self._ctx = self._lib = None
+
+	def close(self): self.destroy()
 
 	def change_props(self, props_dict):
 		self._ctx_call_props('change_props', props_dict)

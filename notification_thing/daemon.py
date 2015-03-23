@@ -312,7 +312,7 @@ class NotificationMethods(object):
 			except (OSError, IOError): return True
 			if ts > mtime:
 				mtime = ts
-				try: cb = core.get_filter(optz.filter_file)
+				try: cb = core.get_filter(optz.filter_file, optz.filter_sound)
 				except:
 					ex, self._filter_callback = traceback.format_exc(), (None, 0)
 					log.debug( 'Failed to load'
@@ -581,6 +581,11 @@ def main(argv=None):
 	parser.add_argument('--filter-test', nargs=2, metavar=('SUMMARY', 'BODY'),
 		help='Do not start daemon, just test given summary'
 			' and body against filter-file and print the result back to terminal.')
+	parser.add_argument('--no-filter-sound',
+		action='store_false', dest='filter_sound', default=True,
+		help='Make sound calls in --filters-file scheme interpreter a no-op.'
+			' Only makes sense if sound calls in filters are actually used'
+				' and libcanberra is available, otherwise there wont be any sounds anyway.')
 
 	parser.add_argument('-t', '--popup-timeout', type=int, default=int(optz['popup_timeout']*1000),
 		help='Default timeout for notification popups removal (default: %(default)sms)')
@@ -672,20 +677,21 @@ def main(argv=None):
 			setattr(optz, k, v)
 		optz = parser.parse_args(args, optz) # re-parse to override cli-specified values
 
+	import logging
+	logging.basicConfig(level=logging.DEBUG if optz.debug else logging.WARNING)
+	log = logging.getLogger('daemon')
+
 	optz.filter_file = os.path.expanduser(optz.filter_file)
 	core.Notification.default_timeout = optz.popup_timeout
+	if optz.filter_sound: optz.filter_sound = core.get_sound_env()
 
 	if optz.filter_test:
-		func = core.get_filter(optz.filter_file)
+		func = core.get_filter(optz.filter_file, optz.filter_sound)
 		filtering_result = func(*optz.filter_test)
 		msg_repr = 'Message - summary: {!r}, body: {!r}'.format(*optz.filter_test)
 		print('{}\nFiltering result: {} ({})'.format( msg_repr,
 			filtering_result, 'will pass' if filtering_result else "won't pass" ))
 		sys.exit()
-
-	import logging
-	logging.basicConfig(level=logging.DEBUG if optz.debug else logging.WARNING)
-	log = logging.getLogger(__name__)
 
 	DBusGMainLoop(set_as_default=True)
 	bus = dbus.SessionBus()

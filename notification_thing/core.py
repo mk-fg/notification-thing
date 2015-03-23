@@ -4,7 +4,7 @@ from __future__ import unicode_literals, print_function
 import itertools as it, operator as op, functools as ft
 from collections import namedtuple, MutableMapping
 from time import time
-import dbus, argparse, re
+import dbus, argparse, re, logging
 
 from .scheme import load, init_env
 from .rate_control import FC_TokenBucket, RRQ
@@ -100,7 +100,28 @@ NotificationMessage = namedtuple('NotificationMessage', 'hostname ts note')
 
 _scheme_init = False
 
-def get_filter(path):
+def get_filter(path, sound_env=None):
 	if not _scheme_init:
-		init_env({'~': lambda regex, string: bool(re.search(regex, string))})
+		sound_env = sound_env or dict()
+		init_env({
+			'~': lambda regex, string: bool(re.search(regex, string)),
+			'play': sound_env.get('play'),
+			'play-sync': sound_env.get('play_sync') })
 	return load(path)
+
+def get_sound_env():
+	assert not _scheme_init # must be initialized before scheme env
+	from .sounds import NotificationSounds, NSoundError, NSoundInitError
+	log = logging.getLogger('core.sound')
+	try:
+		env = NotificationSounds()
+		env.open()
+	except NSoundInitError as err:
+		log.exception('Failed to initialize sound output: %s', err)
+	else:
+		def play_func(name, sync=False):
+			log.debug('Playing sound sample: %r', name)
+			try: [env.play, env.play_sync][bool(sync)](name)
+			except NSoundError as err:
+				log.exception('Failed to play sound sample %r: %s', name, err)
+		return dict(play=play_func, play_sync=ft.partial(play_func, sync=True))

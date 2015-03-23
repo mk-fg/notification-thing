@@ -12,7 +12,7 @@ except IOError: readme = ''
 setup(
 
 	name = 'notification-thing',
-	version = '13.11.0',
+	version = '15.03.0',
 	author = 'Mike Kazantsev',
 	author_email = 'mk.fraggod@gmail.com',
 	license = 'WTFPL',

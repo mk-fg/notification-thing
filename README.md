@@ -1,38 +1,68 @@
-notification-thing: Gtk3 (PyGI) notification daemon
+notification-thing
 --------------------
 
-There are quite a few of the [notification spec](http://developer.gnome.org/notification-spec/)
-implementations, but this one is designed to be not tied to any DE, unlike
-(unfortunately) most of the others were at the time.
+Gtk3/Python (PyGI) notification daemon with flexible (scriptable) filtering,
+rate-limiting and misc other cool features, not tied to any particular DE.
 
-Another thing is that simple implementation of the spec doesn't work for me -
-I need rate-limiting (but without silent dropping of any messages - it's much
-worse!) to maintain sanity while still paying any attention to these popups.
+Features:
 
-Flexible-enough filtering is another thing.
+* Implements [Desktop Notification spec](http://developer.gnome.org/notification-spec/).
 
-Auto-disabling and general ability to block them at will (and again, emphasis on
-not losing messages, which makes you always doubt and second-guess
-notifications, ending up doing the manual info-polling) of these popups during
-fullscreen apps (like when watching video or working on some urgent matter) is
-yet another...
+  Should be compatible with any dbus clients (e.g. libnotify, Gtk3, etc).
+  Supports icons and resizing of these.
 
-Any number of notification-thing instances can be linked via zeromq pub-sub
-sockets (i.e. each one subscribed to all the others) and display notifications
-that arrive via dbus on all other hosts.
+* Tries hard to never drop any notifications silently by itself, even in case of
+  any unexpected errors.
+
+* [Pango markup](https://developer.gnome.org/pango/stable/PangoMarkupFormat.html)
+  support in notification summary and body, option to enable/disable that for
+  individual messages via notification parameters, broken-markup-safe.
+
+* Configurable appearance via
+  [Gtk3 styles](http://developer.gnome.org/gtk3/unstable/GtkCssProvider.html)
+  (simple css files) and themes.
+
+* Rate-limiting using "leaky" token-bucket algorithm, with all the knobs
+  configurable.
+
+  When/if several messages get delayed, they will be displayed batched into one
+  "digest" message, up to a limit (number of last ones), and dropped with a
+  warning line (and a count of these) beyond that.
+
+* Dbus interface allows calls to pause passing notifications, but still
+  buffering these to "digest", force-flushing such buffer, displaying previous
+  (cleaned-up) notifications, changing/pausing default cleanup timeout, etc.
+
+* Can send/receive json-serialized notifications via
+  [ZeroMQ](http://zeromq.org/) pub-sub queues.
+
+  This allows to e.g. tie up several machines to see all notifications which are
+  from any of them or send desktop notifications from a remote machine
+  (doesn't have to be a desktop one either, see included "notify-net" script).
+
+* Filtering using simple but very powerful scheme scripting
+  (based on [Peter Norvig's lispy2](http://norvig.com/lispy2.html)).
+
+* Can play any sounds from anywhere in the filtering scripts
+  (via [libcanberra](http://0pointer.de/lennart/projects/libcanberra/)).
+
+  I.e. on specific occasions, like some regexp-match, not for every message
+  (though that is certainly possible as well), or even multiple samples for one
+  message.
+
+* All options/features are configurable and can be disabled entirely, either
+  from command-line or a YAML configuration file.
+
+See below for a detailed description of each particular feature.
 
 Actual notification rendering is inspired (and based in part on)
 [notipy](https://github.com/the-isz/notipy) project.
 
-I wrote a few extended notes on the subject over time
+I wrote a few extended notes on the project over time
 ([link1](http://blog.fraggod.net/2010/2/libnotify-notification-daemon-shortcomings-and-my-solution),
 [link2](http://blog.fraggod.net/2010/12/Further-improvements-on-notification-daemon),
-[link3](http://blog.fraggod.net/2011/8/Notification-daemon-in-python)), but it's
-mostly summarized above.
-
-How it looks (with built-in css, see below on how to override):
-![displayed notifications shot](https://freecode.com/screenshots/99/a6/99a6235e6a09da8de7316684be59bccf_medium.png
-"A few notifications with a compositing wm (e17). Headers are colored (by default) by priority.")
+[link3](http://blog.fraggod.net/2011/8/Notification-daemon-in-python)), but
+these should be mostly mostly summarized in this README.
 
 
 Installation
@@ -60,19 +90,26 @@ without any installation.
 
 ### Requirements
 
-* [Python 2.7 (not 3.X)](http://python.org/)
-* [dbus-python](http://www.freedesktop.org/wiki/Software/DBusBindings#dbus-python)
+* [Python 2.7 (not 3.X)](http://python.org/).
+
+* [dbus-python](http://www.freedesktop.org/wiki/Software/DBusBindings#dbus-python).
+
 * [GObject-Introspection](https://live.gnome.org/GObjectIntrospection/)-enabled
   [Gtk+](http://www.gtk.org/) 3.X (including Glib, Pango) and
-  [PyGObject](http://live.gnome.org/PyGObject)
+  [PyGObject](http://live.gnome.org/PyGObject).
 
 * (optional) [PyYAML](http://pyyaml.org/) - to configure daemon via YAML file,
   not CLI (--conf option).
+
 * (optional) [pyzmq](http://zeromq.github.io/pyzmq/) - to broadcast/receive
   notification messages over zeromq pub/sub sockets.
 
+* (optional) [libcanberra](http://0pointer.de/lennart/projects/libcanberra/) -
+  to play sounds (from XDG themes or files).
+
 Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here -
-it's usually used to send the messages, not receive and display them.
+it is usually used to send the messages, not receive and display these (that's
+the job of notification-daemon, which generally come with DEs).
 
 
 Usage
@@ -102,8 +139,8 @@ option and "notification_thing.example.yaml" config in the repo.
 
 ##### Filtering
 
-File ~/.notification_filter (configurable via --filter-file option) can be used
-to control filtering mechanism at runtime.
+File ~/.notification_filter (configurable via "--filter-file" option) can be
+used to control filtering mechanism at runtime and play sounds where necessary.
 
 It's the simple scheme script, see [scheme
 submodule](https://github.com/mk-fg/notification-thing/blob/master/notification_thing/scheme.py)
@@ -112,7 +149,9 @@ details.
 
 It's evaluation should return the function which will be called for each
 notification and should return either #t or #f verdict for whether to display it
-or not. Example:
+or not.
+
+Example:
 
 	(define-macro define-matcher (lambda
 	  (name op comp last rev-args)
@@ -130,24 +169,47 @@ or not. Example:
 
 	(lambda (summary body)
 	  (not (or
+
 	    ;; hl-only high-traffic channels
 	    (and
 	      (any~ summary
 	        "^erc: #(gunicorn|zeromq|bookz)$"
 	        "^erc: #anon")
 	      (not (~ "MK_FG" body)))
+
 	    ;; irrelevant service messages
 	    (~ "Undefined CTCP query received. Silently ignored" body)
 	    (and
 	      (~ "^erc: #\S+" summary)
-	      (~ "^\*\*\* #\S+ (was created on|modes:) " body)))))
+	      (~ "^\*\*\* #\S+ (was created on|modes:) " body))
+
+	    ;; play sound on irc nick highlights
+	    (and (~ "^erc:" summary) (~ "MK_FG" body) (play "bell")))))
 
 ~/.notification_filter is reloaded on-the-fly if updated, any errors there will
 yield backtraces in notification windows.
 
-"--filter-test" option can be used to test message summary + body (supplied
-after option) against filter file - will just print filtering verdict for
-supplied data and exit.
+"--filter-test" option can be used to test message summary + body
+(supplied after option) against filter file - will just print filtering verdict for
+supplied summary/body and exit.
+
+
+##### Sounds
+
+Special "play" function (see filtering example above) can plays specified
+sound sample (and always returns #f) via libcanberra from the filtering scripts.
+If libcanberra is not available or failed to init, message will be logged to
+stderr on daemon start and sound-related stuff will simply be ignored.
+
+"play-sync" function works same as "play" but delays filtering until sound ends,
+and is intended for rare cases when e.g. one might want to play several
+different samples in sequence.
+
+Sounds are played only when and where these functions gets invoked from the
+filtering scripts, i.e. not played anywhere at all by default.
+
+"--no-filter-sound" cli/config option can be used to force-disable these,
+don't init/touch libcanberra at all and make "play" into a no-op function.
 
 
 ##### Extra dbus commands
