@@ -53,6 +53,8 @@ Features:
 * All options/features are configurable and can be disabled entirely, either
   from command-line or a YAML configuration file.
 
+* Easy to change and debug - it's just a Python after all.
+
 See below for a detailed description of each particular feature.
 
 Actual notification rendering is inspired (and based in part on)
@@ -140,7 +142,8 @@ option and "notification_thing.example.yaml" config in the repo.
 ##### Filtering
 
 File ~/.notification_filter (configurable via "--filter-file" option) can be
-used to control filtering mechanism at runtime and play sounds where necessary.
+used to control filtering mechanism at runtime and play sounds where necessary
+(see below).
 
 It's the simple scheme script, see [scheme
 submodule](https://github.com/mk-fg/notification-thing/blob/master/notification_thing/scheme.py)
@@ -184,7 +187,7 @@ Example:
 	      (~ "^\*\*\* #\S+ (was created on|modes:) " body))
 
 	    ;; play sound on irc nick highlights
-	    (and (~ "^erc:" summary) (~ "MK_FG" body) (play "bell")))))
+	    (and (~ "^erc:" summary) (~ "MK_FG" body) (sound-play "bell")))))
 
 ~/.notification_filter is reloaded on-the-fly if updated, any errors there will
 yield backtraces in notification windows.
@@ -196,20 +199,23 @@ supplied summary/body and exit.
 
 ##### Sounds
 
-Special "play" function (see filtering example above) can plays specified
+Special "sound-play" function (see filtering example above) can plays specified
 sound sample (and always returns #f) via libcanberra from the filtering scripts.
 If libcanberra is not available or failed to init, message will be logged to
 stderr on daemon start and sound-related stuff will simply be ignored.
 
-"play-sync" function works same as "play" but delays filtering until sound ends,
-and is intended for rare cases when e.g. one might want to play several
-different samples in sequence.
+"sound-play-sync" function works same as "sound-play" but delays filtering until
+sound ends, and is intended for rare cases when e.g. one might want to play
+several different samples in sequence.
+
+There's also "sound-cache" function to use libcanberra's "cache" function
+(to reuse sample on the audio daemon).
 
 Sounds are played only when and where these functions gets invoked from the
 filtering scripts, i.e. not played anywhere at all by default.
 
 "--no-filter-sound" cli/config option can be used to force-disable these,
-don't init/touch libcanberra at all and make "play" into a no-op function.
+don't init/touch libcanberra at all and make sound-* into a no-op functions.
 
 
 ##### Extra dbus commands

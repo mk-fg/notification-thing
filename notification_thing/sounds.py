@@ -113,9 +113,10 @@ class NotificationSounds(object):
 	def change_props(self, props_dict):
 		self._ctx_call_props('change_props', props_dict)
 
-	def play(self, name=None, play_id=None, props_dict=None):
-		props_dict = props_dict or dict()
-		if name: props_dict['event.id'] = name
+	def play(self, name_or_props=None, play_id=None):
+		props_dict = dict()
+		if isinstance(name_or_props, dict): props_dict.update(name_or_props)
+		elif name_or_props: props_dict['event.id'] = name_or_props
 		if play_id is None: play_id = next(self.ca_ids)
 		self._ctx_call_props('play', play_id, props_dict)
 		return play_id
@@ -124,7 +125,10 @@ class NotificationSounds(object):
 		play_id = self.play(name, play_id=play_id, props_dict=props_dict)
 		self.wait(play_id, **wait_kws)
 
-	def cache(self, props_dict):
+	def cache(self, name_or_props):
+		props_dict = dict()
+		if isinstance(name_or_props, dict): props_dict.update(name_or_props)
+		elif name_or_props: props_dict['event.id'] = name_or_props
 		self._ctx_call_props('cache', props_dict)
 
 	def cancel(self, play_id):

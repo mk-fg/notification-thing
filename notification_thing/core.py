@@ -105,8 +105,9 @@ def get_filter(path, sound_env=None):
 		sound_env = sound_env or dict()
 		init_env({
 			'~': lambda regex, string: bool(re.search(regex, string)),
-			'play': sound_env.get('play'),
-			'play-sync': sound_env.get('play_sync') })
+			'sound-play': sound_env.get('play'),
+			'sound-cache': sound_env.get('cache'),
+			'sound-play-sync': sound_env.get('play_sync') })
 	return load(path)
 
 def get_sound_env():
@@ -119,9 +120,9 @@ def get_sound_env():
 	except NSoundInitError as err:
 		log.exception('Failed to initialize sound output: %s', err)
 	else:
-		def play_func(name, sync=False):
-			log.debug('Playing sound sample: %r', name)
-			try: [env.play, env.play_sync][bool(sync)](name)
+		def snd(func, name):
+			log.debug('Sound sample %r: %r', func, name)
+			try: getattr(env, func)(name)
 			except NSoundError as err:
 				log.exception('Failed to play sound sample %r: %s', name, err)
-		return dict(play=play_func, play_sync=ft.partial(play_func, sync=True))
+		return dict((k, ft.partial(snd, k)) for k in b'play play_sync cache'.split())
