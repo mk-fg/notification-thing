@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, print_function
 
@@ -110,8 +110,11 @@ class NotificationMethods(object):
 			summary = 'Notification daemon started <small><tt>¯\(°_o)/¯</tt></small>'
 			body = ( 'Desktop notification daemon started successfully on host: <u>{host}</u>'
 					'\nCode path: <small>{code}</small>'
+					'\nSound enabled: <span color="{sound_color}">{sound}</span>'
 					'\nPubSub enabled: <span color="{pubsub_color}">{pubsub}</span>' )\
 				.format( host=os.uname()[1],
+					sound_color='green' if optz.filter_sound else 'red',
+					sound=unicode(bool(optz.filter_sound)).lower(),
 					pubsub_color='green' if pubsub else 'red',
 					pubsub=unicode(bool(pubsub)).lower(),
 					code=os.path.abspath(os.path.dirname(core.__file__)) )

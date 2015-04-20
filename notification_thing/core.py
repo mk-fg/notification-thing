@@ -104,11 +104,12 @@ _scheme_init = False
 def get_filter(path, sound_env=None):
 	if not _scheme_init:
 		sound_env = sound_env or dict()
+		noop_func = lambda *a: None
 		init_env({
 			'~': lambda regex, string: bool(re.search(regex, string)),
-			'sound-play': sound_env.get('play'),
-			'sound-cache': sound_env.get('cache'),
-			'sound-play-sync': sound_env.get('play_sync') })
+			'sound-play': sound_env.get('play', noop_func),
+			'sound-cache': sound_env.get('cache', noop_func),
+			'sound-play-sync': sound_env.get('play_sync', noop_func) })
 	return load(path)
 
 def get_sound_env():
