@@ -41,7 +41,7 @@ class NotificationDisplay(object):
 
 	window = namedtuple('Window', 'gobj event_boxes')
 	base_css = b'''
-		#notification * { background-color: rgba(255, 255, 255, 0); }
+		#notification #frame { padding: 3px; background-color: #d4ded8; }
 		#notification #hs { background-color: black; }
 
 		#notification #critical { background-color: #ffaeae; }
@@ -53,7 +53,9 @@ class NotificationDisplay(object):
 			font-size: 10px;
 			text-shadow: 1px 1px 0px gray;
 		}
-		#notification #body { font-size: 8px; }'''
+		#notification #body { font-size: 8px; }
+		#notification #body * { background-color: #d4ded8; }
+	'''
 	base_css_min = b'#notification * { font-size: 8; }' # simpliest fallback
 
 
@@ -240,7 +242,7 @@ class NotificationDisplay(object):
 		win.set_default_size(400, 20)
 		ev_boxes = [win]
 
-		frame = Gtk.Frame(shadow_type=Gtk.ShadowType.ETCHED_OUT)
+		frame = Gtk.Frame(name='frame', shadow_type=Gtk.ShadowType.ETCHED_OUT)
 		win.add(frame)
 
 		try: widget_icon = self._get_icon(icon)
