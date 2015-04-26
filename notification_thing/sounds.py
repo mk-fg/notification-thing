@@ -73,6 +73,7 @@ class NotificationSounds(object):
 		except OSError as err: raise NSoundInitError(*err.args)
 		try: self._lib.ca_context_create(ctypes.byref(self._ctx))
 		except NSoundError as err: raise NSoundInitError(*err.args)
+		self.set_default_gtk_theme()
 
 	def __enter__(self):
 		self.open()
@@ -148,6 +149,18 @@ class NotificationSounds(object):
 			if not self.playing(play_id): return
 			time.sleep(poll_delay)
 
+	def set_default_gtk_theme(self):
+		theme = None
+		try: from gi.repository import Gtk
+		except ImportError: pass
+		else:
+			ss = Gtk.Settings.get_default()
+			if ss: theme = ss.get_property('gtk-sound-theme-name')
+		if theme:
+			self.change_props({'canberra.xdg-theme.name': theme})
+		return theme
+
 
 if __name__ == '__main__':
-	NotificationSounds.play_once('phone-incoming-call')
+	sound = sys.argv[1] if len(sys.argv) > 1 else 'phone-incoming-call'
+	NotificationSounds.play_once(sound)
