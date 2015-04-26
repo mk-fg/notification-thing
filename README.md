@@ -220,6 +220,10 @@ notification and possibly play multiple samples (in sequence or at the same time
 "--no-filter-sound" cli/config option can be used to force-disable these,
 don't init/touch libcanberra at all and make sound-* into a no-op functions.
 
+"gtk-sound-theme-name" setting is used to select sound theme in libcanberra,
+"gtk-enable-event-sounds" is NOT used though (not implemented, as it's more
+dynamic and must be monitored for changes).
+
 
 ##### Extra dbus commands
 
