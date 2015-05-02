@@ -672,7 +672,7 @@ def main(argv=None):
 
 	if optz.conf:
 		import yaml
-		for k, v in flatten_dict(yaml.load(open(optz.conf)) or dict()):
+		for k, v in flatten_dict(yaml.safe_load(open(optz.conf)) or dict()):
 			if v is None: continue
 			k = '_'.join(k).replace('-', '_')
 			if not hasattr(optz, k):
@@ -703,7 +703,7 @@ def main(argv=None):
 			or optz.net_sub_bind or optz.net_sub_connect:
 		if optz.net_settings and not isinstance(optz.net_settings, Mapping):
 			import yaml
-			optz.net_settings = yaml.load(optz.net_settings)
+			optz.net_settings = yaml.safe_load(optz.net_settings)
 		pubsub = PubSub(**(optz.net_settings or dict()))
 		for addrs, call in [
 				(optz.net_pub_bind, pubsub.bind_pub),
