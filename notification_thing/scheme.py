@@ -156,7 +156,8 @@ def callcc(proc):
 
 def add_globals(self):
 	'Add some Scheme standard procedures.'
-	import math, cmath
+	import math, cmath, logging
+	log = logging.getLogger(__name__)
 	self.update(vars(math))
 	self.update(vars(cmath))
 	self.update({
@@ -168,7 +169,8 @@ def add_globals(self):
 		'null?':lambda x:x==[], 'symbol?':lambda x: isa(x, Symbol),
 		'boolean?':lambda x: isa(x, bool), 'pair?':is_pair,
 		'apply':lambda proc,l: proc(*l), 'eval':lambda x: eval(expand(x)),
-		'prog':lambda *a:None, 'call/cc':callcc })
+		'prog':lambda *a:None, 'call/cc':callcc,
+		'debug': (lambda *args: log.debug('debug args: %s', args)) })
 	return self
 
 
