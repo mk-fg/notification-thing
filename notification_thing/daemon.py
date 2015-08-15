@@ -686,7 +686,9 @@ def main(argv=None):
 
 	optz.filter_file = os.path.expanduser(optz.filter_file)
 	core.Notification.default_timeout = optz.popup_timeout
-	if optz.filter_sound: optz.filter_sound = core.get_sound_env(force_sync=optz.filter_test)
+	if optz.filter_sound:
+		optz.filter_sound = core.get_sound_env(
+			force_sync=optz.filter_test, trap_errors=not (optz.filter_test or optz.debug) )
 
 	if optz.filter_test:
 		func = core.get_filter(optz.filter_file, optz.filter_sound)

@@ -112,7 +112,7 @@ def get_filter(path, sound_env=None):
 			'sound-play-sync': sound_env.get('play_sync', noop_func) })
 	return load(path)
 
-def get_sound_env(force_sync=False):
+def get_sound_env(force_sync=False, trap_errors=False):
 	assert not _scheme_init # must be initialized before scheme env
 	# XXX: pass window position and allow configuration of canberra props
 	from .sounds import NotificationSounds, NSoundError, NSoundInitError
@@ -132,7 +132,8 @@ def get_sound_env(force_sync=False):
 			log.debug('Sound sample %r: %r', func, name)
 			try: getattr(env, func)(name)
 			except NSoundError as err:
-				log.exception('Failed to play sound sample %r: %s', name, err)
+				if not trap_errors:
+					log.exception('Failed to play sound sample %r: %s', name, err)
 		res = dict((k, ft.partial(snd, k)) for k in b'play play_sync cache'.split())
 		if force_sync: res['play'] = res['play_sync']
 		return res
