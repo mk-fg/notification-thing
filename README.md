@@ -4,6 +4,8 @@ notification-thing
 Gtk3/Python (PyGI) notification daemon with flexible (scriptable) filtering,
 rate-limiting and misc other cool features, not tied to any particular DE.
 
+![showcase image](showcase.jpg)
+
 Features:
 
 * Implements [Desktop Notification spec](http://developer.gnome.org/notification-spec/).
