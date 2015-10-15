@@ -297,8 +297,9 @@ up-to-date stylesheet though):
 	#notification #body { font-size: 8px; }
 	#notification #body * { background-color: #d4ded8; }
 
-For example, to make notification popups have slightly rounded corners (and a
-compositing wm that supports transparency), one can put this to `~/.config/gtk-3.0/gtk.css`:
+For example, if you have compositing wm that supports transparency, to make
+notification popups have slightly rounded corners, one can put this to
+`~/.config/gtk-3.0/gtk.css`:
 
 	#notification #frame { border-radius: 7px; }
 
