@@ -31,7 +31,7 @@ Features:
   "digest" message, up to a limit (number of last ones), and dropped with a
   warning line (and a count of these) beyond that.
 
-* Dbus interface allows calls to pause passing notifications, but still
+* D-Bus interface allows calls to pause passing notifications, but still
   buffering these to "digest", force-flushing such buffer, displaying previous
   (cleaned-up) notifications, changing/pausing default cleanup timeout, etc.
 
@@ -229,7 +229,7 @@ dynamic and must be monitored for changes).
 
 ##### Extra dbus commands
 
-DBus interface can be inspected via usual introspection methods (add "--xml" to
+D-Bus interface can be inspected via usual introspection methods (add "--xml" to
 get more canonical form):
 
 	gdbus introspect --session \
