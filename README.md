@@ -281,7 +281,8 @@ Appearance (and some behavior) of the popup windows is subject to
 (simple css files), with default being the light one (see the actual code for
 up-to-date stylesheet though):
 
-	#notification * { background-color: white; }
+	#notification { background: transparent; }
+	#notification #frame { padding: 3px; background-color: #d4ded8; }
 	#notification #hs { background-color: black; }
 
 	#notification #critical { background-color: #ffaeae; }
@@ -289,11 +290,17 @@ up-to-date stylesheet though):
 	#notification #low { background-color: #bee3c6; }
 
 	#notification #summary {
-	  padding-left: 5px;
-	  font-size: 10px;
-	  text-shadow: 1px 1px 0px gray;
+		padding-left: 5px;
+		font-size: 10px;
+		text-shadow: 1px 1px 0px gray;
 	}
 	#notification #body { font-size: 8px; }
+	#notification #body * { background-color: #d4ded8; }
+
+For example, to make notification popups have slightly rounded corners (and a
+compositing wm that supports transparency), one can put this to `~/.config/gtk-3.0/gtk.css`:
+
+	#notification #frame { border-radius: 7px; }
 
 
 ##### Markup

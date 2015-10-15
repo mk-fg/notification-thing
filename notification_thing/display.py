@@ -41,6 +41,7 @@ class NotificationDisplay(object):
 
 	window = namedtuple('Window', 'gobj event_boxes')
 	base_css = b'''
+		#notification { background: transparent; }
 		#notification #frame { padding: 3px; background-color: #d4ded8; }
 		#notification #hs { background-color: black; }
 
@@ -234,12 +235,18 @@ class NotificationDisplay(object):
 		return widget_icon
 
 
+	def _set_visual(self, win, ev=None):
+		visual = win.get_screen().get_rgba_visual()
+		if visual: win.set_visual(visual)
+
 	def _create_win(self, summary, body, icon=None, urgency_label=None, markup=False):
 		log.debug( 'Creating window with parameters: %s',
 			dict(summary=summary, body=body, icon=icon, urgency=urgency_label, markup=markup) )
 
 		win = Gtk.Window(name='notification', type=Gtk.WindowType.POPUP)
 		win.set_default_size(400, 20)
+		win.connect('screen-changed', self._set_visual)
+		self._set_visual(win)
 		ev_boxes = [win]
 
 		frame = Gtk.Frame(name='frame', shadow_type=Gtk.ShadowType.ETCHED_OUT)
