@@ -11,9 +11,8 @@ import os, sys, traceback, types, math
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import GLib
-
-try: from gi.repository import Gdk
+gi.require_version('Gdk', '3.0')
+try: from gi.repository import GLib, Gdk
 except RuntimeError as err: # less verbose errors in case X isn't running
 	print('Gdk init error, exiting: {}'.format(err.message), file=sys.stderr)
 	sys.exit(1)
