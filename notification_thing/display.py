@@ -43,7 +43,8 @@ class NotificationDisplay(object):
 	window = namedtuple('Window', 'gobj event_boxes')
 	base_css = b'''
 		#notification { background: transparent; }
-		#notification #frame { padding: 3px; background-color: #d4ded8; }
+		#notification #frame { background-color: #d4ded8; }
+		#notification #frame-box { padding: 3px; }
 		#notification #hs { background-color: black; }
 
 		#notification #critical { background-color: #ffaeae; }
@@ -252,6 +253,8 @@ class NotificationDisplay(object):
 
 		frame = Gtk.Frame(name='frame', shadow_type=Gtk.ShadowType.ETCHED_OUT)
 		win.add(frame)
+		frame_box = Gtk.Box(name='frame-box') # common box for all elements, mainly to add padding
+		frame.add(frame_box)
 
 		try: widget_icon = self._get_icon(icon)
 		except Exception: # Gdk may raise errors for some images/formats
@@ -261,11 +264,11 @@ class NotificationDisplay(object):
 		v_box = Gtk.VBox(spacing=self.layout_margin, expand=False)
 		if widget_icon is not None:
 			h_box = Gtk.HBox(spacing=self.layout_margin * 2)
-			frame.add(h_box)
+			frame_box.pack_start(h_box, True, True, 0)
 			h_box.pack_start(widget_icon, False, False, 0)
 			h_box.pack_start(v_box, True, True, 0)
 			ev_boxes.append(h_box)
-		else: frame.add(v_box)
+		else: frame_box.pack_start(v_box, True, True, 0)
 
 		widget_summary = Gtk.Label(name='summary')
 

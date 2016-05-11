@@ -21,7 +21,7 @@ Features:
   individual messages via notification parameters, broken-markup-safe.
 
 * Configurable appearance via
-  [Gtk3 styles](http://developer.gnome.org/gtk3/unstable/GtkCssProvider.html)
+  [Gtk3 styles](https://developer.gnome.org/gtk3/stable/chap-css-overview.html)
   (simple css files) and themes.
 
 * Rate-limiting using "leaky" token-bucket algorithm, with all the knobs
@@ -280,12 +280,13 @@ For example, to temporarily block/unblock all but the urgent notifications:
 ##### Appearance / styles
 
 Appearance (and some behavior) of the popup windows is subject to
-[gtk3 styles](http://developer.gnome.org/gtk3/unstable/GtkCssProvider.html)
-(simple css files), with default being the light one (see the actual code for
+[gtk3 styles](https://developer.gnome.org/gtk3/stable/chap-css-overview.html)
+(css files), with default being the light one (see the actual code for
 up-to-date stylesheet though):
 
 	#notification { background: transparent; }
-	#notification #frame { padding: 3px; background-color: #d4ded8; }
+	#notification #frame { background-color: #d4ded8; }
+	#notification #frame-box { padding: 3px; }
 	#notification #hs { background-color: black; }
 
 	#notification #critical { background-color: #ffaeae; }
@@ -299,6 +300,21 @@ up-to-date stylesheet though):
 	}
 	#notification #body { font-size: 8px; }
 	#notification #body * { background-color: #d4ded8; }
+
+Full hierarchy of gtk3 widgets used (all have "Gtk" prefix in C code), how
+they're placed and named (used as `#<name>` in gtk3 css):
+
+```
+Window #notification
+ Frame #frame
+  Box #frame-box
+   HBox (only if icon is used)
+    Image (icon)  VBox
+                   EventBox #<urgency-level-name>
+                    Label #summary
+                   HSeparator #hs
+                   TextView #body
+```
 
 For example, if you have compositing wm that supports transparency, to make
 notification popups have slightly rounded corners, one can put this to
