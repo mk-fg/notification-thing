@@ -285,8 +285,7 @@ Appearance (and some behavior) of the popup windows is subject to
 up-to-date stylesheet though):
 
 	#notification { background: transparent; }
-	#notification #frame { background-color: #d4ded8; }
-	#notification #frame-box { padding: 3px; }
+	#notification #frame { background-color: #d4ded8; padding: 3px; }
 	#notification #hs { background-color: black; }
 
 	#notification #critical { background-color: #ffaeae; }
@@ -306,14 +305,13 @@ they're placed and named (used as `#<name>` in gtk3 css):
 
 ```
 Window #notification
- Frame #frame
-  Box #frame-box
-   HBox (only if icon is used)
-    Image (icon)  VBox
-                   EventBox #<urgency-level-name>
-                    Label #summary
-                   HSeparator #hs
-                   TextView #body
+ Box #frame
+  HBox (only if icon is used)
+   Image (icon)  VBox
+                  EventBox #<urgency-level-name>
+                   Label #summary
+                  HSeparator #hs
+                  TextView #body
 ```
 
 For example, if you have compositing wm that supports transparency, to make
