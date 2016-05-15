@@ -120,6 +120,7 @@ class NotificationMethods(object):
 			if not self._renderer.markup_default:
 				summary, body = it.imap(strip_markup, [summary, body])
 			self.display(summary, body)
+		if optz.test_sound and optz.filter_sound: optz.filter_sound['play'](optz.test_sound)
 
 
 	def exit(self, reason=None):
@@ -575,8 +576,6 @@ def main(argv=None):
 	parser.add_argument('--no-status-notify',
 		action='store_false', dest='status_notify', default=True,
 		help='Do not send notification on changes in daemon settings.')
-	parser.add_argument('--test-message', action='store_true',
-		help='Issue test notification right after start.')
 
 	parser.add_argument('--filter-file', default='~/.notification_filter', metavar='PATH',
 		help='Read simple scheme rules for filtering notifications from file (default: %(default)s).')
@@ -588,6 +587,12 @@ def main(argv=None):
 		help='Make sound calls in --filters-file scheme interpreter a no-op.'
 			' Only makes sense if sound calls in filters are actually used'
 				' and libcanberra is available, otherwise there wont be any sounds anyway.')
+
+	parser.add_argument('--test-message', action='store_true',
+		help='Issue test notification right after start.')
+	parser.add_argument('--test-sound',
+		help='Play specified sound on startup,'
+			' if sound support is available and enabled for filtering rules.')
 
 	parser.add_argument('-t', '--popup-timeout', type=int, default=int(optz['popup_timeout']*1000),
 		help='Default timeout for notification popups removal (default: %(default)sms)')
