@@ -12,7 +12,7 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
 from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Pango
 
-from .core import urgency_levels
+from . import core
 
 import logging
 log = logging.getLogger(__name__)
@@ -211,7 +211,7 @@ class NotificationDisplay(object):
 					else:
 						log.warn( '"%s" seems to be neither a valid icon file nor'
 							' a name in a freedesktop.org-compliant icon theme (or your theme'
-							' doesnt have that name). Ignoring.', icon )
+							' doesnt have that name). Ignoring.', core.format_trunc(icon) )
 			else:
 				widget_icon = GdkPixbuf.Pixbuf.new_from_data(
 					bytearray(icon[6]), GdkPixbuf.Colorspace.RGB, icon[3], icon[4],
@@ -242,7 +242,8 @@ class NotificationDisplay(object):
 
 	def _create_win(self, summary, body, icon=None, urgency_label=None, markup=False):
 		log.debug( 'Creating window with parameters: %s',
-			dict(summary=summary, body=body, icon=icon, urgency=urgency_label, markup=markup) )
+			core.repr_trunc_rec(dict( summary=summary, body=body,
+				icon=icon, urgency=urgency_label, markup=markup )) )
 
 		win = Gtk.Window(name='notification', type=Gtk.WindowType.POPUP)
 		win.set_default_size(400, 20)
@@ -365,7 +366,7 @@ class NotificationDisplay(object):
 					break
 
 			urgency = note.hints.get('urgency')
-			if urgency is not None: urgency = urgency_levels.by_id(int(urgency))
+			if urgency is not None: urgency = core.urgency_levels.by_id(int(urgency))
 			markup = self.get_note_markup(note)
 
 			win = self._create_win(note.summary, note.body, image, urgency, markup=markup)

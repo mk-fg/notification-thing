@@ -4,7 +4,7 @@ from __future__ import unicode_literals, print_function
 import itertools as it, operator as op, functools as ft
 from collections import namedtuple, MutableMapping
 from time import time
-import dbus, argparse, re, logging
+import dbus, argparse, re, logging, types
 
 from .scheme import load, init_env
 from .rate_control import FC_TokenBucket, RRQ
@@ -25,6 +25,40 @@ class Enum(dict):
 		for k,v in self.viewitems():
 			if v == v_chk: return k
 		else: raise KeyError(v_chk)
+
+
+def force_bytes(bytes_or_unicode, encoding='utf-8', errors='backslashreplace'):
+	if isinstance(bytes_or_unicode, bytes): return bytes_or_unicode
+	return bytes_or_unicode.encode(encoding, errors)
+
+def force_unicode(bytes_or_unicode, encoding='utf-8', errors='replace'):
+	if isinstance(bytes_or_unicode, unicode): return bytes_or_unicode
+	return bytes_or_unicode.decode(encoding, errors)
+
+def to_bytes(obj, **conv_kws):
+	if not isinstance(obj, types.StringTypes): obj = bytes(obj)
+	return force_bytes(obj)
+
+def format_trunc(v, proc=to_bytes, len_max=None):
+	v = proc(v)
+	if len_max is None: len_max = 1024 # len_max_default
+	if len(v) > len_max:
+		v = v[:len_max] + '... (len: {})'.format(len(v))
+	return v
+
+def repr_trunc(v, len_max=None):
+	return format_trunc(v, proc=repr, len_max=len_max)
+
+def repr_trunc_rec(v, len_max=None, len_max_val=None, level=1):
+	if level == 0: return format_trunc(v)
+	if len_max is None: len_max = 2048 # len_max_default
+	if len_max_val is None: len_max_val = 512 # len_max_default
+	rec = ft.partial( repr_trunc_rec,
+		len_max=len_max, len_max_val=len_max_val, level=level-1 )
+	if isinstance(v, dict): v = dict((k, rec(v)) for k,v in v.viewitems())
+	elif isinstance(v, (tuple, list)): v = map(rec, v)
+	else: return format_trunc(v, len_max=len_max_val)
+	return repr_trunc(v, len_max=len_max)
 
 
 ####
