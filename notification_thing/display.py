@@ -213,9 +213,12 @@ class NotificationDisplay(object):
 							' a name in a freedesktop.org-compliant icon theme (or your theme'
 							' doesnt have that name). Ignoring.', core.format_trunc(icon) )
 			else:
+				w, h, rowstride, has_alpha, bits_per_sample, channels, data = icon
+				data = bytes(bytearray(data))
 				widget_icon = GdkPixbuf.Pixbuf.new_from_data(
-					bytearray(icon[6]), GdkPixbuf.Colorspace.RGB, icon[3], icon[4],
-					icon[0], icon[1], icon[2], lambda x, y: None, None )
+					data, GdkPixbuf.Colorspace.RGB, bool(has_alpha),
+					int(bits_per_sample), int(w), int(h), int(rowstride) )
+				widget_icon._data = data # must be preserved from gc
 
 		if widget_icon:
 			if self.icon_width or self.icon_height: # scale icon
