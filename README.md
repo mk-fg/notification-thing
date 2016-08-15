@@ -19,6 +19,7 @@ Features:
 * [Pango markup](https://developer.gnome.org/pango/stable/PangoMarkupFormat.html)
   support in notification summary and body, option to enable/disable that for
   individual messages via notification parameters, broken-markup-safe.
+  Start the thing with --test-message option to see how it works.
 
 * Configurable appearance via
   [Gtk3 styles](https://developer.gnome.org/gtk3/stable/chap-css-overview.html)
@@ -341,6 +342,9 @@ Technically GtkTextView widget used for message body doesn't allow pango markup
 which is very similar to pango, so pango stuff gets ad-hoc converted to
 GtkTextTags (see `display.pango_markup_to_gtk`), and potentially (but unlikely)
 can get something wrong.
+
+Starting daemon with --test-message option will have display pango-markup-heavy
+notification on startup, which can be used to test this stuff.
 
 
 ##### Network broadcasting

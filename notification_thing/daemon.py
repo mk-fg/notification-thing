@@ -107,11 +107,14 @@ class NotificationMethods(object):
 		if optz.test_message:
 			# Also test crazy web-of-90s markup here :P
 			summary = 'Notification daemon started <small><tt>¯\(°_o)/¯</tt></small>'
-			body = ( 'Desktop notification daemon started successfully on host: <u>{host}</u>'
+			body = (
+					'Desktop notification daemon started successfully on host: <u>{host}</u>'
+					'\nVersion: <span stretch="extraexpanded">{v}</span>'
 					'\nCode path: <small>{code}</small>'
 					'\nSound enabled: <span color="{sound_color}">{sound}</span>'
 					'\nPubSub enabled: <span color="{pubsub_color}">{pubsub}</span>' )\
-				.format( host=os.uname()[1],
+				.format(
+					host=os.uname()[1], v=core.__version__,
 					sound_color='green' if optz.filter_sound else 'red',
 					sound=unicode(bool(optz.filter_sound)).lower(),
 					pubsub_color='green' if pubsub else 'red',
