@@ -27,17 +27,10 @@ class Enum(dict):
 		else: raise KeyError(v_chk)
 
 
-def force_bytes(bytes_or_unicode, encoding='utf-8', errors='backslashreplace'):
-	if isinstance(bytes_or_unicode, bytes): return bytes_or_unicode
-	return bytes_or_unicode.encode(encoding, errors)
-
-def force_unicode(bytes_or_unicode, encoding='utf-8', errors='replace'):
-	if isinstance(bytes_or_unicode, unicode): return bytes_or_unicode
-	return bytes_or_unicode.decode(encoding, errors)
-
-def to_bytes(obj, **conv_kws):
+def to_bytes(obj, encoding='utf-8', errors='backslashreplace'):
 	if not isinstance(obj, types.StringTypes): obj = bytes(obj)
-	return force_bytes(obj)
+	if not isinstance(obj, bytes): obj = obj.encode(encoding, errors)
+	return obj
 
 def format_trunc(v, proc=to_bytes, len_max=None):
 	v = proc(v)
