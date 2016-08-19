@@ -29,14 +29,17 @@ class Enum(dict):
 
 def to_bytes(obj, encoding='utf-8', errors='backslashreplace'):
 	if not isinstance(obj, types.StringTypes): obj = bytes(obj)
-	if not isinstance(obj, bytes): obj = obj.encode(encoding, errors)
+	elif not isinstance(obj, bytes): obj = obj.encode(encoding, errors)
 	return obj
 
 def format_trunc(v, proc=to_bytes, len_max=None):
-	v = proc(v)
-	if len_max is None: len_max = 1024 # len_max_default
-	if len(v) > len_max:
-		v = v[:len_max] + '... (len: {})'.format(len(v))
+	try:
+		v = proc(v)
+		if len_max is None: len_max = 1024 # len_max_default
+		if len(v) > len_max: v = v[:len_max] + '... (len: {})'.format(len(v))
+	except Exception as err:
+		logging.getLogger('core.strings')\
+			.exception('Failed to process string %r: %s', v, err)
 	return v
 
 def repr_trunc(v, len_max=None):
