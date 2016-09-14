@@ -36,7 +36,7 @@ def format_trunc(v, proc=to_bytes, len_max=None):
 	try:
 		v = proc(v)
 		if len_max is None: len_max = 1024 # len_max_default
-		if len(v) > len_max: v = v[:len_max] + '... (len: {})'.format(len(v))
+		if len(v) > len_max: v = v[:len_max] + type(v)('... (len: {})'.format(len(v)))
 	except Exception as err:
 		logging.getLogger('core.strings')\
 			.exception('Failed to process string %r: %s', v, err)

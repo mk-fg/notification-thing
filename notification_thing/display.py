@@ -209,9 +209,9 @@ class NotificationDisplay(object):
 						icon, icon_size, Gtk.IconLookupFlags.USE_BUILTIN )
 					if widget_icon: widget_icon = widget_icon.load_icon()
 					else:
-						log.warn( '"%s" seems to be neither a valid icon file nor'
-							' a name in a freedesktop.org-compliant icon theme (or your theme'
-							' doesnt have that name). Ignoring.', core.format_trunc(icon) )
+						log.warn( 'Provided icon info seem to be neither valid icon file nor'
+							' a name in a freedesktop.org-compliant icon theme (or current theme'
+							' does not have that one), ignoring it: %r', core.format_trunc(icon) )
 			else:
 				w, h, rowstride, has_alpha, bits_per_sample, channels, data = icon
 				data = bytes(bytearray(data))
