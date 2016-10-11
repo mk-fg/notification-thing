@@ -120,7 +120,7 @@ class PubSub(object):
 		if isinstance(data, dict): return dict((sdt(k), sdt(v)) for k,v in data.viewitems())
 		elif isinstance(data, (list, tuple)): return map(sdt, data)
 		elif isinstance(data, types.NoneType): return data
-		for t in int, long, unicode, bytes, bool:
+		for t in int, long, unicode, bytes, bool, float:
 			if isinstance(data, t): return t(data)
 		raise ValueError(( 'Failed to sanitize data type:'
 			' {} (mro: {}, value: {})' ).format(type(data), type(data).mro(), data))
