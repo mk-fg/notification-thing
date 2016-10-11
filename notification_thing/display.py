@@ -203,12 +203,7 @@ class NotificationDisplay(object):
 				else:
 					# Available names: Gtk.IconTheme.get_default().list_icons(None)
 					theme = Gtk.IconTheme.get_default()
-					icon_size = 32 # default, overidden by any of the "scale" opts
-					for k in 'fixed', 'min', 'max':
-						for v in self.icon_scale.get(k, list()):
-							if not v: continue
-							icon_size = v
-							break
+					icon_size = any(self.icon_scale.get('fixed', list())) or 32
 					widget_icon = theme.lookup_icon(
 						icon, icon_size, Gtk.IconLookupFlags.USE_BUILTIN )
 					if widget_icon: widget_icon = widget_icon.load_icon()
@@ -234,15 +229,14 @@ class NotificationDisplay(object):
 					if not any([box_w, box_h]): continue
 					if k == 'min' and not ((box_w and w < box_w) or (box_h and h < box_h)): continue
 					if k == 'max' and not ((box_w and w > box_w) or (box_h and h > box_h)): continue
-					# Use max (among w/h) factor on scale-up and min on scale-down,
-					#  so resulting icon will always fit in a specified box,
-					#  and will match it by (at least) w or h (ideally - both)
-					scale = (box_w and w > box_w) or (box_h and h > box_h) # True if it's a scale-up
-					scale = (min if bool(scale) ^ bool(box_w and box_h) else max)\
-						(float(box_w or w) / w, float(box_h or h) / h)
+					scale_down = (box_w and w > box_w) or (box_h and h > box_h)
+					if scale_down: scale = min # factor<1, unspec=1, must fit on both dimensions
+					elif box_w and box_h: scale = min # factor>1, but still pick min to fit on both
+					else: scale = max # ignore unspec=1 and scale to max possible factor
+					scale = scale(float(box_w or w) / w, float(box_h or h) / h)
 					box_w, box_h = w * scale, h * scale
-					log.debug( 'Scaling image (criteria: %s)'
-						' by a factor of %.3f: %dx%d -> %dx%d', k, scale, w, h, box_w, box_h )
+					log.debug( 'Scaling image (%s, criteria: %s) by a factor of'
+						' %.3f: %dx%d -> %dx%d', ['up', 'down'][scale_down], k, scale, w, h, box_w, box_h )
 					widget_icon = widget_icon.scale_simple(box_w, box_h, GdkPixbuf.InterpType.BILINEAR)
 					if k == 'fixed': break # no need to apply min/max after that
 			widget_icon, pixbuf = Gtk.Image(), widget_icon
