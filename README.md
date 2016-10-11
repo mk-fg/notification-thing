@@ -201,7 +201,7 @@ Example:
 	      (any~ summary
 	        "^erc: #(gunicorn|zeromq|bookz)$"
 	        "^erc: #anon")
-	      (not (~ "MK_FG" body)))
+	      (not (~ "mk-fg" body)))
 
 	    ;; irrelevant service messages
 	    (~ "Undefined CTCP query received. Silently ignored" body)
@@ -210,7 +210,7 @@ Example:
 	      (~ "^\*\*\* #\S+ (was created on|modes:) " body))
 
 	    ;; play sound on irc nick highlights
-	    (and (~ "^erc:" summary) (~ "MK_FG" body) (sound-play "bell")))))
+	    (and (~ "^erc:" summary) (~ "mk-fg" body) (sound-play "bell")))))
 
 ~/.notification_filter is reloaded on-the-fly if updated, any errors there will
 yield backtraces in notification windows.
