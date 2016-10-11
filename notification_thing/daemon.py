@@ -567,59 +567,81 @@ def main(argv=None):
 				' parent section name with dash (e.g. --tbf-size).'
 			' Any values specified on command line will override corresponding ones from file.'
 			' See also notification_thing.example.yaml file.')
+	parser.add_argument('--debug', action='store_true', help='Enable debug logging to stderr.')
 
-	parser.add_argument('-f', '--no-fs-check',
-		action='store_false', dest='fs_check', default=True,
-		help='Dont queue messages if active window is fullscreen')
-	parser.add_argument('-u', '--no-urgency-check',
-		action='store_false', dest='urgency_check', default=True,
-		help='Queue messages even if urgency is critical')
-	parser.add_argument('-c', '--activity-timeout', type=int, default=int(optz['activity_timeout']),
+	group = parser.add_argument_group('Daemon operation settings and notification defaults')
+	group.add_argument('-c', '--activity-timeout',
+		type=float, default=float(optz['activity_timeout']), metavar='seconds',
 		help='No-activity (dbus calls) timeout before closing the daemon instance'
 			' (less or equal zero - infinite, default: %(default)ss)')
-	parser.add_argument('--no-status-notify',
+	group.add_argument('-t', '--popup-timeout',
+		type=float, default=float(optz['popup_timeout']*1000), metavar='seconds',
+		help='Default timeout for notification popups removal (default: %(default)sms)')
+	group.add_argument('-q', '--queue-len',
+		type=int, default=optz['queue_len'], metavar='n',
+		help='How many messages should be queued on tbf overflow (default: %(default)s)')
+	group.add_argument('-s', '--history-len',
+		type=int, default=optz['history_len'], metavar='n',
+		help='How many last *displayed* messages to'
+			' remember to display again on demand (default: %(default)s)')
+
+	group = parser.add_argument_group('Test/startup messages and sounds')
+	group.add_argument('--test-message', action='store_true',
+		help='Issue test notification right after start.')
+	group.add_argument('--test-sound', metavar='path',
+		help='Play specified sound on startup,'
+			' if sound support is available and enabled for filtering rules.')
+
+	group = parser.add_argument_group('Basic notification processing options')
+	group.add_argument('-f', '--no-fs-check',
+		action='store_false', dest='fs_check', default=True,
+		help='Dont queue messages if active window is fullscreen')
+	group.add_argument('-u', '--no-urgency-check',
+		action='store_false', dest='urgency_check', default=True,
+		help='Queue messages even if urgency is critical')
+	group.add_argument('--no-status-notify',
 		action='store_false', dest='status_notify', default=True,
 		help='Do not send notification on changes in daemon settings.')
 
-	parser.add_argument('--filter-file', default='~/.notification_filter', metavar='PATH',
+	group = parser.add_argument_group('Scheme-based notification filtering')
+	group.add_argument('--filter-file', default='~/.notification_filter', metavar='path',
 		help='Read simple scheme rules for filtering notifications from file (default: %(default)s).')
-	parser.add_argument('--filter-test', nargs=2, metavar=('SUMMARY', 'BODY'),
+	group.add_argument('--filter-test', nargs=2, metavar=('summary', 'body'),
 		help='Do not start daemon, just test given summary'
 			' and body against filter-file and print the result back to terminal.')
-	parser.add_argument('--no-filter-sound',
+	group.add_argument('--no-filter-sound',
 		action='store_false', dest='filter_sound', default=True,
 		help='Make sound calls in --filters-file scheme interpreter a no-op.'
 			' Only makes sense if sound calls in filters are actually used'
 				' and libcanberra is available, otherwise there wont be any sounds anyway.')
 
-	parser.add_argument('--test-message', action='store_true',
-		help='Issue test notification right after start.')
-	parser.add_argument('--test-sound',
-		help='Play specified sound on startup,'
-			' if sound support is available and enabled for filtering rules.')
-
-	parser.add_argument('-t', '--popup-timeout', type=int, default=int(optz['popup_timeout']*1000),
-		help='Default timeout for notification popups removal (default: %(default)sms)')
-	parser.add_argument('-q', '--queue-len', type=int, default=optz['queue_len'],
-		help='How many messages should be queued on tbf overflow (default: %(default)s)')
-	parser.add_argument('-s', '--history-len', type=int, default=optz['history_len'],
-		help='How many last *displayed* messages to'
-			' remember to display again on demand (default: %(default)s)')
-
-	parser.add_argument('--layout-anchor', choices=core.layout_anchor,
+	group = parser.add_argument_group('Display layout (e.g. position, direction, etc) options')
+	group.add_argument('--layout-anchor', choices=core.layout_anchor,
 		action=EnumAction(core.layout_anchor), default=core.layout_anchor.top_left,
 		help='Screen corner notifications gravitate to (default: top_left).')
-	parser.add_argument('--layout-direction', choices=core.layout_direction,
+	group.add_argument('--layout-direction', choices=core.layout_direction,
 		action=EnumAction(core.layout_direction), default=core.layout_direction.vertical,
 		help='Direction for notification stack growth from --layout-anchor corner (default: vertical).')
-	parser.add_argument('--layout-margin', default=3,
+	group.add_argument('--layout-margin', default=3, metavar='px',
 		help='Margin between notifications, screen edges, and some misc stuff (default: %(default)spx).')
-	parser.add_argument('--icon-width', '--img-w', type=int, metavar='px',
-		help='Scale icon (preserving aspect ratio) to width.')
-	parser.add_argument('--icon-height', '--img-h', type=int, metavar='px',
-		help='Scale icon (preserving aspect ratio) to height.')
 
-	parser.add_argument('--markup-disable', action='store_true',
+	group = parser.add_argument_group('Icon scaling options')
+	group.add_argument('--icon-width', '--img-w', type=int, metavar='px',
+		help='Scale all icons (preserving aspect ratio) to specified width.'
+			' In --icon-height is also specified, icons will be "fitted" into a WxH box, never larger.')
+	group.add_argument('--icon-height', '--img-h', type=int, metavar='px',
+		help='Scale all icons (preserving aspect ratio) to specified height.'
+			' In --icon-width is also specified, icons will be "fitted" into a WxH box, never larger.')
+	# group.add_argument('--icon-size-max', '--img-max', metavar='[w]x[h]',
+	# 	help='Scale icons larger than specified size'
+	# 			' in any dimension down to it, preserving aspect ratio.'
+	# 		' Value must be in "[w]x[h]" format, with w/h'
+	# 			' being integers for size in pixels, either one or both of them can be specified.'
+	# 		' Differs from --icon-width/--icon-height in'
+	# 			' that it only scales-down larger ones, not all icons.')
+
+	group = parser.add_argument_group('Text pango markup options')
+	group.add_argument('--markup-disable', action='store_true',
 		help='Enable pango markup (tags, somewhat similar to html)'
 				' processing in all message summary/body parts by default.'
 			' These will either be rendered by pango'
@@ -627,53 +649,61 @@ def main(argv=None):
 			' "x-nt-markup" bool hint can be used to'
 				' enable/disable markup on per-message basis, regardless of this option value.'
 			' See "Markup" section of the README for more details.')
-	parser.add_argument('--markup-strip-on-err', action='store_true',
+	group.add_argument('--markup-strip-on-err', action='store_true',
 		help='Strip markup tags if pango fails to parse them'
 			' (when parsing markup is enabled) instead of rendering message with them as text.')
-	parser.add_argument('--markup-warn-on-err', action='store_true',
+	group.add_argument('--markup-warn-on-err', action='store_true',
 		help='Issue loggin warning if passed markup tags cannot be parsed (when it is enabled).')
 
-	parser.add_argument('--tbf-size', type=int, default=optz['tbf_size'],
+	group = parser.add_argument_group('Token-bucket message rate-limiting options')
+	group.add_argument('--tbf-size',
+		type=int, default=optz['tbf_size'], metavar='n',
 		help='Token-bucket message-flow filter (tbf) bucket size (default: %(default)s)')
-	parser.add_argument('--tbf-tick', type=int, default=optz['tbf_tick'],
+	group.add_argument('--tbf-tick',
+		type=float, default=optz['tbf_tick'], metavar='seconds',
 		help='tbf update interval (new token), so token_inflow = token / tbf_tick (default: %(default)ss)')
-	parser.add_argument('--tbf-max-delay', type=int, default=optz['tbf_max_delay'],
+	group.add_argument('--tbf-max-delay',
+		type=float, default=optz['tbf_max_delay'], metavar='seconds',
 		help='Maxmum amount of seconds, between message queue flush (default: %(default)ss)')
-	parser.add_argument('--tbf-inc', type=int, default=optz['tbf_inc'],
+	group.add_argument('--tbf-inc',
+		type=float, default=optz['tbf_inc'], metavar='value',
 		help='tbf_tick multiplier on consequent tbf overflow (default: %(default)s)')
-	parser.add_argument('--tbf-dec', type=int, default=optz['tbf_dec'],
+	group.add_argument('--tbf-dec',
+		type=float, default=optz['tbf_dec'], metavar='value',
 		help='tbf_tick divider on successful grab from non-empty bucket,'
 			' wont lower multiplier below 1 (default: %(default)s)')
 
-	parser.add_argument('--dbus-interface', default=optz['dbus_interface'],
+	group = parser.add_argument_group('DBus options')
+	group.add_argument('--dbus-interface',
+		default=optz['dbus_interface'], metavar='iface',
 		help='DBus interface to use (default: %(default)s)')
-	parser.add_argument('--dbus-path', default=optz['dbus_path'],
+	group.add_argument('--dbus-path',
+		default=optz['dbus_path'], metavar='path',
 		help='DBus object path to bind to (default: %(default)s)')
 
-	parser.add_argument('--net-pub-bind',
+	group = parser.add_argument_group('Network pub/sub options')
+	group.add_argument('--net-pub-bind',
 		action='append', metavar='ip:port',
 		help='Publish messages over network on a specified socket endpoint.'
 			' Can be either ip:port (assumed to be tcp socket,'
 				' e.g. 1.2.3.4:5678) or full zmq url (e.g. tcp://1.2.3.4:5678).'
 			' Can be specified multiple times.')
-	parser.add_argument('--net-pub-connect',
+	group.add_argument('--net-pub-connect',
 		action='append', metavar='ip:port',
 		help='Send published messages to specified subscriber socket (see --net-sub-bind).'
 			' Same format as for --net-pub-bind.  Can be specified multiple times.')
-	parser.add_argument('--net-sub-bind',
+	group.add_argument('--net-sub-bind',
 		action='append', metavar='ip:port',
 		help='Create subscriber socket that'
 				' publishers can connect and send messages to (see --net-pub-connect).'
 			' Same format as for --net-pub-bind.  Can be specified multiple times.')
-	parser.add_argument('--net-sub-connect',
+	group.add_argument('--net-sub-connect',
 		action='append', metavar='ip:port',
 		help='Receive published messages from a specified pub socket (see --net-pub-bind).'
 			' Same format as for --net-pub-bind.  Can be specified multiple times.')
-	parser.add_argument('--net-settings', metavar='yaml',
+	group.add_argument('--net-settings', metavar='yaml',
 		help='Optional yaml/json encoded settings'
 			' for PubSub class init (e.g. hostname, buffer, reconnect_max, etc).')
-
-	parser.add_argument('--debug', action='store_true', help='Enable debug logging to stderr.')
 
 	args = argv or sys.argv[1:]
 	optz = parser.parse_args(args)
