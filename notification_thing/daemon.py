@@ -93,9 +93,8 @@ class NotificationMethods(object):
 		self._note_id_pool = it.chain.from_iterable(
 			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
 		self._renderer = NotificationDisplay(
-			optz.layout_margin, optz.layout_anchor,
-			optz.layout_direction, optz.icon_width, optz.icon_height,
-			markup_default=not optz.markup_disable,
+			optz.layout_margin, optz.layout_anchor, optz.layout_direction,
+			icon_scale=optz.icon_scale, markup_default=not optz.markup_disable,
 			markup_warn=optz.markup_warn_on_err, markup_strip=optz.markup_strip_on_err )
 		self._activity_event()
 
@@ -552,6 +551,7 @@ def main(argv=None):
 	global optz, log
 	import argparse
 
+	class OptzParserError(Exception): pass
 	def EnumAction(enum):
 		class EnumAction(argparse.Action):
 			def __call__(self, parser, namespace, values, option_string=None):
@@ -632,13 +632,15 @@ def main(argv=None):
 	group.add_argument('--icon-height', '--img-h', type=int, metavar='px',
 		help='Scale all icons (preserving aspect ratio) to specified height.'
 			' In --icon-width is also specified, icons will be "fitted" into a WxH box, never larger.')
-	# group.add_argument('--icon-size-max', '--img-max', metavar='[w]x[h]',
-	# 	help='Scale icons larger than specified size'
-	# 			' in any dimension down to it, preserving aspect ratio.'
-	# 		' Value must be in "[w]x[h]" format, with w/h'
-	# 			' being integers for size in pixels, either one or both of them can be specified.'
-	# 		' Differs from --icon-width/--icon-height in'
-	# 			' that it only scales-down larger ones, not all icons.')
+	group.add_argument('--icon-size-max', '--img-max', metavar='WxH',
+		help='Scale icons larger than specified size'
+				' in any dimension down to it, preserving aspect ratio.'
+			' Value must be in "[w]x[h]" format, with w/h'
+				' being integers for size in pixels, either one or both of them can be specified.'
+			' Differs from --icon-width/--icon-height in'
+				' that it only scales-down larger ones, not all icons.')
+	group.add_argument('--icon-size-min', '--img-min', metavar='WxH',
+		help='Same as --icon-size-max, but scales-up smaller images to a specified min size.')
 
 	group = parser.add_argument_group('Text pango markup options')
 	group.add_argument('--markup-disable', action='store_true',
@@ -735,6 +737,23 @@ def main(argv=None):
 		print('{}\nFiltering result: {} ({})'.format( msg_repr,
 			filtering_result, 'will pass' if filtering_result else "won't pass" ))
 		sys.exit()
+
+	optz.icon_scale = dict()
+	if optz.icon_width or optz.icon_height:
+		optz.icon_scale['fixed'] = optz.icon_width, optz.icon_height
+	else:
+		for k in 'min', 'max':
+			v = getattr(optz, 'icon_size_{}'.format(k))
+			if not v: continue
+			try:
+				if 'x' not in v: raise OptzParserError
+				if v.endswith('x'): v += '0'
+				if v.startswith('x'): v = '0' + v
+				w, h = map(int, v.split('x'))
+			except OptzParserError:
+				parser.error( 'Invalid --icon-size-{}'
+					' value (must be in "[w]x[h]" format): {!r}'.format(k, v) )
+			optz.icon_scale[k] = w, h
 
 	DBusGMainLoop(set_as_default=True)
 	bus = dbus.SessionBus()

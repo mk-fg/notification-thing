@@ -11,7 +11,7 @@ Features:
 * Implements [Desktop Notification spec](http://developer.gnome.org/notification-spec/).
 
   Should be compatible with any dbus clients (e.g. libnotify, Gtk3, etc).
-  Supports icons and resizing of these.
+  Supports icons and resizing of these (to a fixed/min/max box).
 
 * Tries hard to never drop any notifications silently by itself, even in case of
   any unexpected errors.
@@ -120,8 +120,8 @@ the job of notification-daemon, which generally come with DEs).
 Usage
 --------------------
 
-Just make sure nothing else is already listening on the same dbus path/interface
-and start the daemon by hand.
+Make sure nothing else is already listening on the same dbus path/interface and
+start the daemon by hand - should work.
 
 Alternatively, dbus service file can be installed, so daemon can be started
 whenever notifications arrive (and exiting during silence timeouts):

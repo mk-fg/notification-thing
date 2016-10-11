@@ -1,0 +1,12 @@
+[Unit]
+Requires=dbus.service
+After=xorg.target dbus.service
+
+[Service]
+SyslogIdentifier=%p
+Restart=always
+RestartSec=10
+ExecStart=/usr/bin/env notification-thing --activity-timeout 0 --conf ${HOME}/.notification.yaml
+
+[Install]
+WantedBy=default.target

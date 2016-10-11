@@ -62,7 +62,7 @@ class NotificationDisplay(object):
 
 
 	def __init__( self, layout_margin,
-			layout_anchor, layout_direction, icon_width, icon_height,
+			layout_anchor, layout_direction, icon_scale=dict(),
 			markup_default=False, markup_warn=False, markup_strip=False ):
 		self.margins = dict(it.chain.from_iterable(map(
 			lambda ax: ( (2**ax, layout_margin),
@@ -70,8 +70,7 @@ class NotificationDisplay(object):
 		self.layout_margin = layout_margin
 		self.layout_anchor = layout_anchor
 		self.layout_direction = layout_direction
-		self.icon_width = icon_width
-		self.icon_height = icon_height
+		self.icon_scale = icon_scale
 		self.markup_default = markup_default
 		self.markup_warn, self.markup_strip = markup_warn, markup_strip
 
@@ -204,7 +203,12 @@ class NotificationDisplay(object):
 				else:
 					# Available names: Gtk.IconTheme.get_default().list_icons(None)
 					theme = Gtk.IconTheme.get_default()
-					icon_size = self.icon_width or self.icon_height or 32
+					icon_size = 32 # default, overidden by any of the "scale" opts
+					for k in 'fixed', 'min', 'max':
+						for v in self.icon_scale.get(k, list()):
+							if not v: continue
+							icon_size = v
+							break
 					widget_icon = theme.lookup_icon(
 						icon, icon_size, Gtk.IconLookupFlags.USE_BUILTIN )
 					if widget_icon: widget_icon = widget_icon.load_icon()
@@ -223,18 +227,24 @@ class NotificationDisplay(object):
 				widget_icon._data = data # must be preserved from gc
 
 		if widget_icon:
-			if self.icon_width or self.icon_height: # scale icon
+			if any(it.chain.from_iterable(self.icon_scale.values())): # scale icon
 				w, h = widget_icon.get_width(), widget_icon.get_height()
-				# Use max (among w/h) factor on scale-up and min on scale-down,
-				#  so resulting icon will always fit in a specified box,
-				#  and will match it by (at least) w or h (ideally - both)
-				scale = (self.icon_width and w > self.icon_width)\
-					or (self.icon_height and h > self.icon_height) # True if it's a scale-up
-				scale = (min if bool(scale) ^ bool(
-						self.icon_width and self.icon_height ) else max)\
-					(float(self.icon_width or w) / w, float(self.icon_height or h) / h)
-				widget_icon = widget_icon.scale_simple(
-					w * scale, h * scale, GdkPixbuf.InterpType.BILINEAR )
+				for k in 'fixed', 'min', 'max':
+					box_w, box_h = self.icon_scale.get(k, (0, 0))
+					if not any([box_w, box_h]): continue
+					if k == 'min' and not ((box_w and w < box_w) or (box_h and h < box_h)): continue
+					if k == 'max' and not ((box_w and w > box_w) or (box_h and h > box_h)): continue
+					# Use max (among w/h) factor on scale-up and min on scale-down,
+					#  so resulting icon will always fit in a specified box,
+					#  and will match it by (at least) w or h (ideally - both)
+					scale = (box_w and w > box_w) or (box_h and h > box_h) # True if it's a scale-up
+					scale = (min if bool(scale) ^ bool(box_w and box_h) else max)\
+						(float(box_w or w) / w, float(box_h or h) / h)
+					box_w, box_h = w * scale, h * scale
+					log.debug( 'Scaling image (criteria: %s)'
+						' by a factor of %.3f: %dx%d -> %dx%d', k, scale, w, h, box_w, box_h )
+					widget_icon = widget_icon.scale_simple(box_w, box_h, GdkPixbuf.InterpType.BILINEAR)
+					if k == 'fixed': break # no need to apply min/max after that
 			widget_icon, pixbuf = Gtk.Image(), widget_icon
 			widget_icon.set_from_pixbuf(pixbuf)
 
