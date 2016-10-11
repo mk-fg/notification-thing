@@ -6,7 +6,8 @@ After=xorg.target dbus.service
 SyslogIdentifier=%p
 Restart=always
 RestartSec=10
-ExecStart=/usr/bin/env notification-thing --activity-timeout 0 --conf ${HOME}/.notification.yaml
+ExecStart=/usr/bin/env notification-thing\
+	--activity-timeout 0 --conf-missing-ok --conf ${HOME}/.notification.yaml
 
 [Install]
 WantedBy=default.target

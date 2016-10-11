@@ -567,6 +567,8 @@ def main(argv=None):
 				' parent section name with dash (e.g. --tbf-size).'
 			' Any values specified on command line will override corresponding ones from file.'
 			' See also notification_thing.example.yaml file.')
+	parser.add_argument('--conf-missing-ok', action='store_true',
+		help='Safely ignore missing or inaccessible configuration files.')
 	parser.add_argument('--debug', action='store_true', help='Enable debug logging to stderr.')
 
 	group = parser.add_argument_group('Daemon operation settings and notification defaults')
@@ -710,6 +712,7 @@ def main(argv=None):
 	args = argv or sys.argv[1:]
 	optz = parser.parse_args(args)
 
+	if optz.conf_missing_ok and not os.access(optz.conf, os.R_OK): optz.conf = None
 	if optz.conf:
 		import yaml
 		for k, v in flatten_dict(yaml.safe_load(open(optz.conf)) or dict()):

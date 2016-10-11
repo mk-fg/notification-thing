@@ -123,10 +123,30 @@ Usage
 Make sure nothing else is already listening on the same dbus path/interface and
 start the daemon by hand - should work.
 
+Run the script with -h/--help option to get the (rather long) list of all
+possible configuration options and tunables.
+
 Alternatively, dbus service file can be installed, so daemon can be started
 whenever notifications arrive (and exiting during silence timeouts):
 
 	cp org.freedesktop.Notifications.service /usr/share/dbus-1/services/
+
+Another way would be to start the thing from systemd user session or something
+like that, e.g. ~/.xinitrc for older systems.
+
+To enable startup with systemd user session for particular user, run following
+from that user's shell:
+
+	mkdir -p ~/.config/systemd/user/
+	cp notification-thing.service ~/.config/systemd/user/
+	systemctl --user enable notification-thing
+
+Can also start it manually then by `systemctl --user start notification-thing`
+command.
+
+"notification-thing.service" systemd unit from the repository makes daemon read
+`~/.notification.yaml` configuration file by default, if it exists, so any extra
+options to the auto-started daemon instance can be specified there (see below).
 
 
 ##### Configuration
