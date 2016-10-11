@@ -192,7 +192,7 @@ class NotificationDisplay(object):
 						* (2 * (2**ax ^ (2**ax & self.layout_anchor)) / 2**ax - 1), xrange(2) ))
 
 
-	def _get_icon(self, icon):
+	def _get_icon(self, icon, remote=False):
 		widget_icon = None
 
 		if icon is not None:
@@ -209,9 +209,11 @@ class NotificationDisplay(object):
 						icon, icon_size, Gtk.IconLookupFlags.USE_BUILTIN )
 					if widget_icon: widget_icon = widget_icon.load_icon()
 					else:
-						log.warn( 'Provided icon info seem to be neither valid icon file nor'
-							' a name in a freedesktop.org-compliant icon theme (or current theme'
-							' does not have that one), ignoring it: %r', core.format_trunc(icon) )
+						# Msgs from remote hosts natually can have non-local icon paths in them
+						(log.warn if not remote else log.debug)(
+							'Provided icon info seem to be neither valid icon file nor'
+								' a name in a freedesktop.org-compliant icon theme (or current theme'
+								' does not have that one), ignoring it: %r', core.format_trunc(icon) )
 			else:
 				w, h, rowstride, has_alpha, bits_per_sample, channels, data = icon
 				data = bytes(bytearray(data))
@@ -243,7 +245,8 @@ class NotificationDisplay(object):
 		visual = win.get_screen().get_rgba_visual()
 		if visual: win.set_visual(visual)
 
-	def _create_win(self, summary, body, icon=None, urgency_label=None, markup=False):
+	def _create_win( self, summary, body,
+			icon=None, urgency_label=None, markup=False, remote=None ):
 		log.debug( 'Creating window with parameters: %s',
 			core.repr_trunc_rec(dict( summary=summary, body=body,
 				icon=icon, urgency=urgency_label, markup=markup )) )
@@ -257,7 +260,7 @@ class NotificationDisplay(object):
 		frame = Gtk.Box(name='frame')
 		win.add(frame)
 
-		try: widget_icon = self._get_icon(icon)
+		try: widget_icon = self._get_icon(icon, remote=remote)
 		except Exception: # Gdk may raise errors for some images/formats
 			log.exception('Failed to set notification icon')
 			widget_icon = None
@@ -372,7 +375,8 @@ class NotificationDisplay(object):
 			if urgency is not None: urgency = core.urgency_levels.by_id(int(urgency))
 			markup = self.get_note_markup(note)
 
-			win = self._create_win(note.summary, note.body, image, urgency, markup=markup)
+			win = self._create_win( note.summary, note.body,
+				image, urgency, markup=markup, remote=note.hints.get('x-notification-thing-from-remote') )
 
 			for eb in win.event_boxes:
 				eb.add_events(
