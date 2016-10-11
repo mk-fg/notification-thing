@@ -753,7 +753,7 @@ def main(argv=None):
 				if v.endswith('x'): v += '0'
 				if v.startswith('x'): v = '0' + v
 				w, h = map(int, v.split('x'))
-			except OptzParserError:
+			except:
 				parser.error( 'Invalid --icon-size-{}'
 					' value (must be in "[w]x[h]" format): {!r}'.format(k, v) )
 			optz.icon_scale[k] = w, h
