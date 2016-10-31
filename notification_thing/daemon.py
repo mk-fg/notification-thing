@@ -624,7 +624,7 @@ def main(argv=None):
 	group.add_argument('--layout-direction', choices=core.layout_direction,
 		action=EnumAction(core.layout_direction), default=core.layout_direction.vertical,
 		help='Direction for notification stack growth from --layout-anchor corner (default: vertical).')
-	group.add_argument('--layout-margin', default=3, metavar='px',
+	group.add_argument('--layout-margin', default=3, type=int, metavar='px',
 		help='Margin between notifications, screen edges, and some misc stuff (default: %(default)spx).')
 
 	group = parser.add_argument_group('Icon scaling options')
