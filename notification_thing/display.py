@@ -67,7 +67,6 @@ class NotificationDisplay(object):
 		self.margins = dict(it.chain.from_iterable(map(
 			lambda ax: ( (2**ax, layout_margin),
 				(-2**ax, layout_margin) ), xrange(2) )))
-		self.layout_margin = layout_margin
 		self.layout_anchor = layout_anchor
 		self.layout_direction = layout_direction
 		self.icon_scale = icon_scale
@@ -269,9 +268,10 @@ class NotificationDisplay(object):
 			log.exception('Failed to set notification icon')
 			widget_icon = None
 
-		v_box = Gtk.VBox(spacing=self.layout_margin, expand=False)
+		box_margin = 3
+		v_box = Gtk.VBox(spacing=box_margin, expand=False)
 		if widget_icon is not None:
-			h_box = Gtk.HBox(spacing=self.layout_margin * 2)
+			h_box = Gtk.HBox(spacing=box_margin * 2)
 			frame.pack_start(h_box, True, True, 0)
 			h_box.pack_start(widget_icon, False, False, 0)
 			h_box.pack_start(v_box, True, True, 0)
