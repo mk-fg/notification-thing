@@ -550,15 +550,6 @@ def notification_daemon_factory(*dbus_svc_argz, **dbus_svc_kwz):
 def main(argv=None):
 	global optz, log
 	import argparse
-
-	class OptzParserError(Exception): pass
-	def EnumAction(enum):
-		class EnumAction(argparse.Action):
-			def __call__(self, parser, namespace, values, option_string=None):
-				setattr(namespace, self.dest, self.enum[values])
-		EnumAction.enum = enum
-		return EnumAction
-
 	parser = argparse.ArgumentParser(description='Desktop notification server.')
 
 	parser.add_argument('--conf', metavar='path',
@@ -618,12 +609,13 @@ def main(argv=None):
 				' and libcanberra is available, otherwise there wont be any sounds anyway.')
 
 	group = parser.add_argument_group('Display layout (e.g. position, direction, etc) options')
-	group.add_argument('--layout-anchor', choices=core.layout_anchor,
-		action=EnumAction(core.layout_anchor), default=core.layout_anchor.top_left,
-		help='Screen corner notifications gravitate to (default: top_left).')
-	group.add_argument('--layout-direction', choices=core.layout_direction,
-		action=EnumAction(core.layout_direction), default=core.layout_direction.vertical,
-		help='Direction for notification stack growth from --layout-anchor corner (default: vertical).')
+	group.add_argument('--layout-anchor',
+		choices=core.layout_anchor, default='top_left',
+		help='Screen corner notifications gravitate to (default: %(default)s).')
+	group.add_argument('--layout-direction',
+		choices=core.layout_direction, default='vertical',
+		help='Direction for notification stack growth'
+			' from --layout-anchor corner (default: %(default)s).')
 	group.add_argument('--layout-margin', default=3, type=int, metavar='px',
 		help='Margin between notifications, screen edges, and some misc stuff (default: %(default)spx).')
 
@@ -722,6 +714,8 @@ def main(argv=None):
 				parser.error('Unrecognized option in config file ({}): {}'.format(optz.conf, k))
 			setattr(optz, k, v)
 		optz = parser.parse_args(args, optz) # re-parse to override cli-specified values
+	for k in 'layout_anchor', 'layout_direction':
+		setattr(optz, k, getattr(core, k)[getattr(optz, k)])
 
 	import logging
 	logging.basicConfig(level=logging.DEBUG if optz.debug else logging.WARNING)
@@ -749,7 +743,7 @@ def main(argv=None):
 			v = getattr(optz, 'icon_size_{}'.format(k))
 			if not v: continue
 			try:
-				if 'x' not in v: raise OptzParserError
+				if 'x' not in v: raise ValueError
 				if v.endswith('x'): v += '0'
 				if v.startswith('x'): v = '0' + v
 				w, h = map(int, v.split('x'))
