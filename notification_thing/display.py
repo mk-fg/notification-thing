@@ -317,7 +317,7 @@ class NotificationDisplay(object):
 				if props: widget_body_buffer.insert_with_tags(pos, text, get_tag(props))
 				else: widget_body_buffer.insert(pos, text)
 
-		v_box.pack_start(widget_body, False, False, 0)
+		v_box.pack_start(widget_body, True, True, 0)
 		ev_boxes.append(widget_body)
 
 		# Make sure the window is initially drawn off-screen, because it can't be
