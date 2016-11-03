@@ -380,7 +380,7 @@ class NotificationDisplay(object):
 			markup = self.get_note_markup(note)
 
 			win = self._create_win( note.summary, note.body,
-				image, urgency, markup=markup, remote=note.hints.get('x-notification-thing-from-remote') )
+				image, urgency, markup=markup, remote=note.hints.get('x-nt-from-remote') )
 
 			for eb in win.event_boxes:
 				eb.add_events(

@@ -280,7 +280,7 @@ class NotificationMethods(object):
 				if ts_diff > 15 * 60: # older than 15min
 					prefix = '{}[{}]'.format(prefix, ts_diff_format(ts_diff))
 				note.summary = '{} // {}'.format(prefix, note.summary)
-				note.hints['x-notification-thing-from-remote'] = msg.hostname
+				note.hints['x-nt-from-remote'] = msg.hostname
 				self.filter_display(note)
 		except: log.exception('Unhandled error with remote notification')
 		finally: return True # for glib to keep watcher
