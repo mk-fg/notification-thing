@@ -340,7 +340,7 @@ class NotificationDisplay(object):
 	def get_display_body(self, body, markup):
 		if markup:
 			_, text, attr_list = self._pango_markup_parse(body)
-			if attr_list is not None: markup, body_attrs = False, [(text, None)]
+			if attr_list is None: markup, body_attrs = False, [(text, None)]
 			else: body_attrs = self._pango_markup_to_gtk(text, attr_list)
 		else: text, body_attrs = body, [(body, None)]
 		return markup, text, body_attrs
