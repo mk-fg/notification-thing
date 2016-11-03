@@ -315,10 +315,10 @@ up-to-date stylesheet though):
 
 	#notification #summary {
 		padding-left: 5px;
-		font-size: 10px;
+		font-size: 1.2em;
 		text-shadow: 1px 1px 0px gray;
 	}
-	#notification #body { font-size: 8px; }
+	#notification #body { font-size: 1em; }
 	#notification #body * { background-color: #d4ded8; }
 
 Full hierarchy of gtk3 widgets used (all have "Gtk" prefix in C code), how
@@ -340,6 +340,12 @@ notification popups have slightly rounded corners, one can put this to
 `~/.config/gtk-3.0/gtk.css`:
 
 	#notification #frame { border-radius: 7px; }
+
+Or, to use ~20% larger font size (wrt default size) in both notification summary
+and body text:
+
+	#notification #summary { font-size: 1.4em; }
+	#notification #body { font-size: 1.2em; }
 
 
 ##### Markup
