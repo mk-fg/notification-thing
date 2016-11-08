@@ -335,6 +335,9 @@ Window #notification
                   TextView #body
 ```
 
+(to see tree of these for running app, find all style nodes, tweak stuff on the fly
+and such, use [Gtk-Inspector](https://wiki.gnome.org/Projects/GTK%2B/Inspector))
+
 For example, if you have compositing wm that supports transparency, to make
 notification popups have slightly rounded corners, one can put this to
 `~/.config/gtk-3.0/gtk.css`:
@@ -348,7 +351,7 @@ and body text:
 	#notification #body { font-size: 1.2em; }
 
 
-##### Markup
+##### Text markup
 
 [Pango markup](https://developer.gnome.org/pango/stable/PangoMarkupFormat.html)
 both in message body and summary is supported and processing of it is enabled by
