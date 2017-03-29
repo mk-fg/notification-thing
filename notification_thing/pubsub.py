@@ -30,6 +30,8 @@ class PubSub(object):
 				Should be float of seconds to linger on close, attempting to deliver stuff.
 			reconnect_max - max interval between peer reconnection attempts.'''
 		self.hostname, self.buffer = hostname or os.uname()[1], buffer
+		if blocking_send:
+			raise NotImplementedError('blocking_send option does not work properly at the moment.')
 		self.blocking_send = blocking_send
 		self._init_id(peer_id)
 		self._init_encoding()

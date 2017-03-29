@@ -88,8 +88,7 @@ def main(args=None):
 	if opts.hint: raise NotImplementedError(opts.hint)
 
 	## Dispatch
-	with closing(PubSub( opts.hostname,
-			reconnect_max=None, blocking_send=opts.wait_connect )) as pub:
+	with closing(PubSub(opts.hostname, reconnect_max=None)) as pub:
 		log.debug('Connecting to %s peer(s)', len(opts.dst))
 		for dst in opts.dst: pub.connect(dst)
 		sleep(opts.wait_connect)
