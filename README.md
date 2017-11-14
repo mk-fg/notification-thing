@@ -67,7 +67,7 @@ I wrote a few extended notes on the project over time
 ([link1](http://blog.fraggod.net/2010/2/libnotify-notification-daemon-shortcomings-and-my-solution),
 [link2](http://blog.fraggod.net/2010/12/Further-improvements-on-notification-daemon),
 [link3](http://blog.fraggod.net/2011/8/Notification-daemon-in-python)), but
-these should be mostly mostly summarized in this README.
+these should be mostly summarized in this README.
 
 
 Installation
@@ -173,14 +173,24 @@ File ~/.notification_filter (configurable via "--filter-file" option) can be
 used to control filtering mechanism at runtime and play sounds where necessary
 (see below).
 
-It's the simple scheme script, see [scheme
-submodule](https://github.com/mk-fg/notification-thing/blob/master/notification_thing/scheme.py)
-or [original Peter Norvig's implementation](http://norvig.com/lispy2.html) for
-details.
+It's the simple scheme script, see
+[scheme submodule](https://github.com/mk-fg/notification-thing/blob/master/notification_thing/scheme.py)
+or [original Peter Norvig's "lispy2" implementation](http://norvig.com/lispy2.html)
+for details.
 
-It's evaluation should return the function which will be called for each
-notification and should return either #t or #f verdict for whether to display it
-or not.
+Global definitions:
+
+- All the basic scheme stuff from lispy2:
+  [notification_thing/scheme.py#L164-L173](https://github.com/mk-fg/notification-thing/blob/0e8862c/notification_thing/scheme.py#L164-L173)
+
+- `(~ re msg)` - regexp search.
+- `(debug val-1 ...)` - print all arguments to --debug log.
+- `(sound-play name)`, `(sound-play-sync name)`, etc - play sounds via
+  libcanberra, if available - see note on sounds below.
+
+Evaluation of the filter script should return the function which will be called
+for each notification and should return either #t or #f verdict value for
+whether to display it or not.
 
 Example:
 
@@ -193,32 +203,50 @@ Example:
 	          (,op ,@(if rev-args '((car args) atom) '(atom (car args))))
 	          (apply ,name (cons atom (cdr args))))))))))
 
-	(define-matcher ~all ~ and #t #f)
-	(define-matcher all~ ~ and #t #t)
-	(define-matcher ~any ~ or #f #f)
-	(define-matcher any~ ~ or #f #t)
+	(define-matcher ~all ~ and #t #f) ; (~all re msg-1 ...)
+	(define-matcher all~ ~ and #t #t) ; (all~ msg re-1 ...)
+	(define-matcher ~any ~ or #f #f)  ; (~any re msg-1 ...)
+	(define-matcher any~ ~ or #f #t)  ; (any~ msg re-1 ...)
+
+	(define-macro log-kern~ (lambda (level pat)
+	  `(~ ,(+ "^kern\." level " kernel\[-\]:\s+\[[\d.]+] " pat) body)))
 
 	(lambda (summary body)
 	  (not (or
+	    ;; first section that returns #t suppresses notification
 
-	    ;; hl-only high-traffic channels
-	    (and
-	      (any~ summary
-	        "^erc: #(gunicorn|zeromq|bookz)$"
-	        "^erc: #anon")
-	      (not (~ "mk-fg" body)))
+	    ;; --- irc
+	    (and (~ "^erc:" summary) (or
+	      ;; hl-only high-traffic channels
+	      (and
+	        (any~ summary
+	          "^erc: #(python|linux|bookz)$"
+	          "^erc: (root|\*status)")
+	        (not (~ "mk-fg" body)))
+	      ;; irrelevant service messages
+	      (~ "Undefined CTCP query received. Silently ignored" body)
+	      (and
+	        (~ "^erc: #\S+" summary)
+	        (or
+	          (~ "^\*\*\* #\S+ (was created on|modes:) " body)
+	          (~ "^\s*\*\*\*\s+\S+\s+\(\S+\) is now known as \S+$" body)))
+	      ;; make a sound
+	      (sound-play (or
+	        (and (~ "mk-fg" body) "bell") ;; nick highlight
+	        (and (~ "^erc: [^#]" summary) "phone-incoming-call") ;; query
+	        "message-new-instant"))))
 
-	    ;; irrelevant service messages
-	    (~ "Undefined CTCP query received. Silently ignored" body)
-	    (and
-	      (~ "^erc: #\S+" summary)
-	      (~ "^\*\*\* #\S+ (was created on|modes:) " body))
+	    ;; --- mail
+	    (and (~ "^New Mail:" summary) (sound-play "message"))
 
-	    ;; play sound on irc nick highlights
-	    (and (~ "^erc:" summary) (~ "mk-fg" body) (sound-play "bell")))))
+	    ;; --- sounds for log monitoring events
+	    (sound-play
+	      (and (= summary "log:") (or
+	        (and (log-kern~ "info" "input: ") "device-added")
+	        (and (log-kern~ "info" "usb [-\d.]+: USB disconnect") "device-removed")))))))
 
-~/.notification_filter is reloaded on-the-fly if updated, any errors there will
-yield backtraces in notification windows.
+~/.notification_filter is reloaded on-the-fly if updated, any errors will create
+additional notification windows (with backtraces), as well as logged.
 
 "--filter-test" option can be used to test message summary + body
 (supplied after option) against filter file - will just print filtering verdict for
