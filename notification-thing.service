@@ -1,3 +1,7 @@
+# Example config from my desktop setup.
+# App options are very unlikely to change, so feel free to tweak any
+#  stuff here to suit your setup/distro and don't update it from the repository.
+
 [Unit]
 Requires=dbus.service
 After=xorg.target dbus.service
@@ -6,8 +10,8 @@ After=xorg.target dbus.service
 SyslogIdentifier=%p
 Restart=always
 RestartSec=10
-ExecStart=/usr/bin/env notification-thing\
-	--activity-timeout 0 --conf-missing-ok --conf ${HOME}/.notification.yaml
+ExecStart=/usr/bin/env notification-thing \
+	--activity-timeout 0 --conf-missing-ok --conf "${HOME}/.notification.yaml"
 
 [Install]
 WantedBy=default.target

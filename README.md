@@ -148,6 +148,11 @@ command.
 `~/.notification.yaml` configuration file by default, if it exists, so any extra
 options to the auto-started daemon instance can be specified there (see below).
 
+Note that both files are just an examples from dev setup, so feel free to tweak
+them (e.g. add whatever options, change paths, dependencies, etc) to suit your
+setup/distro (and ship adjusted file with the package, no need to pull these
+from repository).
+
 
 ##### Configuration
 
