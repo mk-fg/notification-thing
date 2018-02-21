@@ -17,6 +17,7 @@
 # tbf_size: 10
 # tbf-tick: 30
 # tbf_max_delay: 30
+# feed-icon: face-smile
 
 ## Network relay configuration
 # net:

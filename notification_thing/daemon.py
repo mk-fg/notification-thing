@@ -426,7 +426,7 @@ class NotificationMethods(object):
 						else 'Feed ({} dropped)'.format(self._note_buffer.dropped),
 					'\n\n'.join(it.starmap( '--- {}\n  {}'.format,
 						it.imap(op.itemgetter('summary', 'body'), self._note_buffer) )),
-					app_name='notification-feed', icon='FBReader' ) )
+					app_name='notification-feed', icon=optz.feed_icon ) )
 			self._note_buffer.flush()
 			log.debug('Notification buffer flushed')
 
@@ -668,6 +668,11 @@ def main(argv=None):
 		type=float, default=optz['tbf_dec'], metavar='value',
 		help='tbf_tick divider on successful grab from non-empty bucket,'
 			' wont lower multiplier below 1 (default: %(default)s)')
+	group.add_argument('--feed-icon',
+		type=float, default=optz['feed_icon'], metavar='icon',
+		help='Icon name/path to use for aggregated ("feed") notification.'
+			' Can be full path to icon, local "file://..." url,'
+				' or name from xdg theme (e.g. "face-smile").')
 
 	group = parser.add_argument_group('DBus options')
 	group.add_argument('--dbus-interface',

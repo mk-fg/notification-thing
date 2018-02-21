@@ -46,6 +46,7 @@ def repr_trunc(v, len_max=None):
 	return format_trunc(v, proc=repr, len_max=len_max)
 
 def repr_trunc_rec(v, len_max=None, len_max_val=None, level=1):
+	# Formats all dict values as strings with quotes - it's fine, not worth the trouble fixing
 	if level == 0: return format_trunc(v)
 	if len_max is None: len_max = 2048 # len_max_default
 	if len_max_val is None: len_max_val = 512 # len_max_default
@@ -61,7 +62,7 @@ def repr_trunc_rec(v, len_max=None, len_max_val=None, level=1):
 
 optz = dict(
 	activity_timeout=10*60, popup_timeout=5,
-	queue_len=10, history_len=200,
+	queue_len=10, history_len=200, feed_icon=None,
 	tbf_size=4, tbf_tick=15, tbf_max_delay=60, tbf_inc=2, tbf_dec=2,
 	dbus_interface='org.freedesktop.Notifications', dbus_path='/org/freedesktop/Notifications' )
 poll_interval = 60
