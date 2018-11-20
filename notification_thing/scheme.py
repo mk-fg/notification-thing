@@ -1,8 +1,10 @@
-## I use this when I need some embedded language
-# Original (c) Peter Norvig, 2010; See http://norvig.com/lispy2.html
-
+# -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals, print_function
+
 import itertools as it, operator as op, functools as ft
+
+## Very simple embedded scheme
+# Original (c) Peter Norvig, 2010; See http://norvig.com/lispy2.html
 
 
 global_env = macro_table = symbol_table = None

@@ -25,11 +25,13 @@ if __name__ == '__main__':
 	if module_root not in sys.path: sys.path.insert(0, module_root)
 	from notification_thing.display import NotificationDisplay, strip_markup
 	from notification_thing.pubsub import PubSub
+	from notification_thing.file_logger import FileLogger
 	from notification_thing import core
 
 else:
 	from .display import NotificationDisplay
 	from .pubsub import PubSub
+	from .file_logger import FileLogger
 	from . import core
 
 optz, poll_interval, close_reasons, urgency_levels =\
@@ -81,7 +83,7 @@ class NotificationMethods(object):
 	plugged, timeout_cleanup = False, True
 	_activity_timer = None
 
-	def __init__(self, pubsub=None):
+	def __init__(self, pubsub=None, logger=None):
 		tick_strangle_max = op.truediv(optz.tbf_max_delay, optz.tbf_tick)
 		self._note_limit = core.FC_TokenBucket(
 			tick=optz.tbf_tick, burst=optz.tbf_size,
@@ -102,6 +104,7 @@ class NotificationMethods(object):
 		if pubsub:
 			GLib.io_add_watch( pubsub.fileno(),
 				GLib.PRIORITY_DEFAULT, GLib.IO_IN | GLib.IO_PRI, self._notify_pubsub )
+		self.logger = logger
 
 		if optz.test_message:
 			# Also test crazy web-of-90s markup here :P
@@ -360,13 +363,23 @@ class NotificationMethods(object):
 			or (w >= screen.get_width() - jitter and h >= screen.get_height() - jitter)
 
 	def filter_display(self, note):
+		'Main method which all notifications are passed to for processing/display.'
 		note_summary, note_body = self._note_plaintext(note)
-		if not self._notification_check(note_summary, note_body):
+		filter_pass = self._notification_check(note_summary, note_body)
+		try: urgency = int(note.hints['urgency'])
+		except (KeyError, ValueError): urgency = None
+
+		if self.logger and (filter_pass or optz.log_filtered):
+			try: self.logger.write(note_summary, note_body, urgency=urgency, ts=note.created)
+			except:
+				ex = traceback.format_exc()
+				log.debug('Notification logger failed:\n%s', ex)
+				if optz.status_notify: self.display('notification-thing: notification logger failed', ex)
+
+		if not filter_pass:
 			log.debug('Dropped notification due to negative filtering result: %r', note_summary)
 			return 0
 
-		try: urgency = int(note.hints['urgency'])
-		except (KeyError, ValueError): urgency = None
 		if optz.urgency_check and urgency == core.urgency_levels.critical:
 			self._note_limit.consume()
 			log.debug('Urgent message immediate passthru, tokens left: %s', self._note_limit.tokens)
@@ -539,8 +552,8 @@ def notification_daemon_factory(*dbus_svc_argz, **dbus_svc_kwz):
 
 	class NotificationDaemon(NotificationMethods, dbus.service.Object):
 		__metaclass__ = _add_dbus_decorators
-		def __init__(self, pubsub, *dbus_svc_argz, **dbus_svc_kwz):
-			NotificationMethods.__init__(self, pubsub)
+		def __init__(self, pubsub, logger, *dbus_svc_argz, **dbus_svc_kwz):
+			NotificationMethods.__init__(self, pubsub, logger)
 			dbus.service.Object.__init__(self, *dbus_svc_argz, **dbus_svc_kwz)
 
 	return NotificationDaemon(*dbus_svc_argz, **dbus_svc_kwz)
@@ -657,7 +670,8 @@ def main(argv=None):
 		help='Token-bucket message-flow filter (tbf) bucket size (default: %(default)s)')
 	group.add_argument('--tbf-tick',
 		type=float, default=optz['tbf_tick'], metavar='seconds',
-		help='tbf update interval (new token), so token_inflow = token / tbf_tick (default: %(default)ss)')
+		help='tbf update interval (new token),'
+			' so token_inflow = token / tbf_tick (default: %(default)ss)')
 	group.add_argument('--tbf-max-delay',
 		type=float, default=optz['tbf_max_delay'], metavar='seconds',
 		help='Maxmum amount of seconds, between message queue flush (default: %(default)ss)')
@@ -706,6 +720,19 @@ def main(argv=None):
 		help='Optional yaml/json encoded settings'
 			' for PubSub class init (e.g. hostname, buffer, reconnect_max, etc).')
 
+	group = parser.add_argument_group('Message logging options')
+	group.add_argument('--log-file', metavar='file',
+		help='Path to a log file to record all messages to.'
+			' Initial ~ or ~user components are auto-expanded to home dirs.')
+	group.add_argument('--log-filtered', action='store_true',
+		help='Enable logging for messages that did not pass through filtering checks.')
+	group.add_argument('--log-rotate-files', type=int, metavar='file-count',
+		help='Enable automatic log file roatation with specified number of old files kept.')
+	group.add_argument('--log-rotate-size',
+		type=int, metavar='bytes', default='1048576',
+		help='Rotate files after they get larger'
+			' than specified number of bytes. Default: 1 MiB.')
+
 	args = argv or sys.argv[1:]
 	optz = parser.parse_args(args)
 
@@ -738,7 +765,7 @@ def main(argv=None):
 		msg_repr = 'Message - summary: {!r}, body: {!r}'.format(*optz.filter_test)
 		print('{}\nFiltering result: {} ({})'.format( msg_repr,
 			filtering_result, 'will pass' if filtering_result else "won't pass" ))
-		sys.exit()
+		return
 
 	optz.icon_scale = dict()
 	if optz.icon_width or optz.icon_height:
@@ -760,6 +787,7 @@ def main(argv=None):
 	DBusGMainLoop(set_as_default=True)
 	bus = dbus.SessionBus()
 
+	pubsub = None
 	if optz.net_pub_bind or optz.net_pub_connect\
 			or optz.net_sub_bind or optz.net_sub_connect:
 		if optz.net_settings and not isinstance(optz.net_settings, Mapping):
@@ -775,9 +803,13 @@ def main(argv=None):
 			for addr in set(addrs or set()):
 				log.debug('zmq link: %s %s', call.im_func.func_name, addr)
 				call(addr)
-	else: pubsub = None
 
-	daemon = notification_daemon_factory( pubsub, bus,
+	logger = None
+	if optz.log_file:
+		logger = FileLogger( os.path.expanduser(optz.log_file),
+			files=optz.log_rotate_files, size_limit=optz.log_rotate_size )
+
+	daemon = notification_daemon_factory( pubsub, logger, bus,
 		optz.dbus_path, dbus.service.BusName(optz.dbus_interface, bus) )
 	loop = GLib.MainLoop()
 	log.debug('Starting gobject loop')

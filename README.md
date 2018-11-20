@@ -53,6 +53,8 @@ Features:
   (though that is certainly possible as well), different sounds based on
   notification message, or even multiple samples for the same one.
 
+* Optional logging for notifications with built-in file rotation.
+
 * All options/features are configurable and can be disabled entirely, either
   from command-line or a YAML configuration file.
 
