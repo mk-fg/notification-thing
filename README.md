@@ -22,7 +22,7 @@ Features:
   Start the thing with --test-message option to see how it works.
 
 * Configurable appearance via
-  [Gtk3 styles](https://developer.gnome.org/gtk3/stable/chap-css-overview.html)
+  [Gtk3 styles](https://developer.gnome.org/gtk3/stable/theming.html)
   (simple css files) and themes.
 
 * Rate-limiting using "leaky" token-bucket algorithm, with all the knobs
@@ -336,7 +336,7 @@ For example, to temporarily block/unblock all but the urgent notifications:
 ##### Appearance / styles
 
 Appearance (and some behavior) of the popup windows is subject to
-[gtk3 styles](https://developer.gnome.org/gtk3/stable/chap-css-overview.html)
+[gtk3 styles](https://developer.gnome.org/gtk3/stable/theming.html)
 (css files), with default being the light one (see the actual code for
 up-to-date stylesheet though):
 
