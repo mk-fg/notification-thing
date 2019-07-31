@@ -16,7 +16,7 @@ Features:
 * Tries hard to never drop any notifications silently by itself, even in case of
   any unexpected errors.
 
-* [Pango markup](https://developer.gnome.org/pango/stable/PangoMarkupFormat.html)
+* [Pango markup](https://developer.gnome.org/pango/stable/pango-Markup.html)
   support in notification summary and body, option to enable/disable that for
   individual messages via notification parameters, broken-markup-safe.
   Start the thing with --test-message option to see how it works.
@@ -388,7 +388,7 @@ and body text:
 
 ##### Text markup
 
-[Pango markup](https://developer.gnome.org/pango/stable/PangoMarkupFormat.html)
+[Pango markup](https://developer.gnome.org/pango/stable/pango-Markup.html)
 both in message body and summary is supported and processing of it is enabled by
 default (can be disabled with --markup-disable).
 

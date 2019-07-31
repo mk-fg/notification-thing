@@ -82,73 +82,20 @@ class NotificationDisplay(object):
 
 
 	def _pango_markup_parse(self, text, _err_mark='[TN82u8] '):
-		success = True
-		try: _, attr_list, text, _ = Pango.parse_markup(text, -1, '\0')
+		try:
+			success, _, text, _ = Pango.parse_markup(text, -1, '\0')
+			if not success: raise GLib.GError('pango_parse_markup failure')
 		except GLib.GError as err:
+			success = False # should be rendered as text
 			if self.markup_warn:
 				msg_start = '{}Pango formatting failed'.format(_err_mark)
 				if msg_start not in text: # detect and avoid possible feedback loops
-					log.warn('%s (%s) for text, stripping markup: %r', msg_start, err, text)
-				else: text = xml_escape(text) # escape message so it'd render bugged part
-			if self.markup_strip: text = strip_markup(text)
-			try: _, attr_list, text, _ = Pango.parse_markup(text, -1, '\0')
-			except GLib.GError: attr_list = None
-			success = False
-		return success, text, attr_list
-
-	def _pango_markup_to_gtk( self, text, attr_list=None,
-			_pango_classes={
-				'SIZE': Pango.AttrInt,
-				'WEIGHT': Pango.AttrInt,
-				'UNDERLINE': Pango.AttrInt,
-				'STRETCH': Pango.AttrInt,
-				'VARIANT': Pango.AttrInt,
-				'STYLE': Pango.AttrInt,
-				'SCALE': Pango.AttrFloat,
-				'FAMILY': Pango.AttrString,
-				'FONT_DESC': Pango.AttrFontDesc,
-				'STRIKETHROUGH': Pango.AttrInt,
-				'BACKGROUND': Pango.AttrColor,
-				'FOREGROUND': Pango.AttrColor,
-				'RISE': Pango.AttrInt },
-			_pango_to_gtk={'font_desc': 'font'} ):
-		# See https://bugzilla.gnome.org/show_bug.cgi?id=59390 for why it is necessary
-		# And doesn't work with GI anyway because of
-		#  https://bugzilla.gnome.org/show_bug.cgi?id=646788
-		#  "Behdad Esfahbod [pango developer]: I personally have no clue how to fix this"
-		# Workaround from https://github.com/matasbbb/pitivit/commit/da815339e
-		# TODO: fix when AttrList.get_iterator will be accessible via GI or textbuffer gets set_markup()
-		if attr_list is None:
-			_, text, attr_list = self._pango_markup_parse(text)
-			if attr_list is None:
-				yield (text, None)
-				raise StopIteration
-
-		gtk_tags = defaultdict(dict)
-		def parse_attr(attr, _data):
-			gtk_attr = attr.klass.type.value_nick
-			if gtk_attr in _pango_to_gtk: gtk_attr = _pango_to_gtk[gtk_attr]
-			pango_attr, span = attr.klass.type.value_name, (attr.start_index, attr.end_index)
-			assert pango_attr.startswith('PANGO_ATTR_'), pango_attr
-			attr.__class__ = _pango_classes[pango_attr[11:]] # allows to access attr.value
-			for k in 'value', 'ink_rect', 'logical_rect', 'desc', 'color':
-				if not hasattr(attr, k): continue
-				val = getattr(attr, k)
-				if k == 'color':
-					val = '#' + ''.join('{:02x}'.format(v/256) for v in [val.red, val.green, val.blue])
-				gtk_tags[span][gtk_attr] = val
-				break
-			else:
-				raise KeyError('Failed to extract value for pango attribute: {}'.format(pango_attr))
-			return False
-		attr_list.filter(parse_attr, None)
-
-		pos = 0
-		for (a, b), props in sorted(gtk_tags.viewitems()):
-			if a > pos: yield (text[pos:a], None)
-			yield (text[a:b], props)
-			pos = b
-		if text[pos:]: yield (text[pos:], None)
+					log.warn('%s (%s) for text, stripping markup: %r', msg_start, core.to_str(err), text)
+			if self.markup_strip: # strip + re-parse to convert xml entities and such
+				text = strip_markup(text)
+				try: _, _, text, _ = Pango.parse_markup(text, -1, '\0')
+				except GLib.GError: pass
+		return success, text
 
 
 	def _get_default_css(self):
@@ -281,10 +228,12 @@ class NotificationDisplay(object):
 		widget_summary = Gtk.Label(name='summary')
 
 		# Sanitize tags through pango first, so set_markup won't produce empty label
-		summary_markup, summary_text, summary\
-			= self.get_display_summary(summary, markup)
-		if summary_markup: widget_summary.set_markup(summary)
-		else: widget_summary.set_text(summary)
+		markup_summary = markup
+		if markup_summary:
+			markup_summary, text = self._pango_markup_parse(summary)
+			if markup_summary: widget_summary.set_markup(summary)
+			else: summary = text
+		if not markup_summary: widget_summary.set_text(summary)
 
 		widget_summary.set_alignment(0, 0)
 		if urgency_label:
@@ -301,21 +250,15 @@ class NotificationDisplay(object):
 			cursor_visible=False, editable=False )
 		widget_body_buffer = widget_body.get_buffer()
 
-		body_markup, body_text, body_attrs = self.get_display_body(body, markup)
-		if not body_markup: widget_body_buffer.set_text(body_text)
-		else:
-			# This buffer uses pango markup, even though GtkTextView does not support it
-			# Most magic is in pango_markup_to_gtk(), there doesn't seem to be any cleaner way
-			def get_tag(props, _tag_id=iter(xrange(2**31-1)), _tag_table=dict()):
-				k = tuple(sorted(props.viewitems()))
-				if k not in _tag_table:
-					_tag_table[k] = widget_body_buffer\
-						.create_tag('x{}'.format(next(_tag_id)), **props)
-				return _tag_table[k]
-			pos = widget_body_buffer.get_end_iter()
-			for text, props in body_attrs:
-				if props: widget_body_buffer.insert_with_tags(pos, text, get_tag(props))
-				else: widget_body_buffer.insert(pos, text)
+		# Same as with summary - sanitize tags through pango first
+		markup_body = markup
+		if markup_body:
+			markup_body, text = self._pango_markup_parse(body)
+			if markup_body:
+				cursor = widget_body_buffer.get_end_iter()
+				widget_body_buffer.insert_markup(cursor, body, -1)
+			else: body = text
+		if not markup_body: widget_body_buffer.set_text(body)
 
 		v_box.pack_start(widget_body, True, True, 0)
 		ev_boxes.append(widget_body)
@@ -330,30 +273,16 @@ class NotificationDisplay(object):
 		return self.window(win, ev_boxes)
 
 
-	def get_display_summary(self, summary, markup):
-		if markup:
-			success, text, _ = self._pango_markup_parse(summary)
-			if not success: markup, summary = False, text
-		else: text = summary
-		return markup, text, summary
-
-	def get_display_body(self, body, markup):
-		if markup:
-			_, text, attr_list = self._pango_markup_parse(body)
-			if attr_list is None: markup, body_attrs = False, [(text, None)]
-			else: body_attrs = self._pango_markup_to_gtk(text, attr_list)
-		else: text, body_attrs = body, [(body, None)]
-		return markup, text, body_attrs
-
 	def get_note_markup(self, note):
 		return note.hints.get('x-nt-markup', self.markup_default)
 
 	def get_note_text(self, note):
 		'Returns note text, stripped of all markup, if any (and if enabled).'
-		markup = self.get_note_markup(note)
-		_, summary_text, _ = self.get_display_summary(note.summary, markup)
-		_, body_text, _ = self.get_display_body(note.body, markup)
-		return summary_text, body_text
+		markup, summary, body = self.get_note_markup(note), note.summary, note.body
+		if markup:
+			_, summary = self._pango_markup_parse(summary)
+			_, body = self._pango_markup_parse(body)
+		return summary, body
 
 
 	def display(self, note, cb_dismiss=None, cb_hover=None, cb_leave=None):

@@ -32,6 +32,11 @@ def to_bytes(obj, encoding='utf-8', errors='backslashreplace'):
 	elif not isinstance(obj, bytes): obj = obj.encode(encoding, errors)
 	return obj
 
+def to_str(obj, encoding='utf-8', errors='replace'):
+	if not isinstance(obj, types.StringTypes): obj = bytes(obj)
+	if isinstance(obj, bytes): obj = obj.decode(encoding, errors)
+	return obj
+
 def format_trunc(v, proc=to_bytes, len_max=None):
 	try:
 		v = proc(v)
