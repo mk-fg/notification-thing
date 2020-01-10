@@ -51,12 +51,13 @@ class NotificationDisplay(object):
 		#notification #low { background-color: #bee3c6; }
 
 		#notification #summary {
+			color: black;
 			padding-left: 5px;
 			font-size: 1.2em;
 			text-shadow: 1px 1px 0px gray;
 		}
-		#notification #body { font-size: 1em; }
-		#notification #body * { background-color: #d4ded8; }
+		#notification #body { color: black; font-size: 1em; }
+		#notification #body * { color: black; background-color: #d4ded8; }
 	'''
 	base_css_min = b'#notification * { font-size: 8; }' # simpliest fallback
 
