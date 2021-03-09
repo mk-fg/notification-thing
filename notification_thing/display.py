@@ -77,8 +77,10 @@ class NotificationDisplay(object):
 		self._windows = OrderedDict()
 
 		self._default_style = self._get_default_css()
+		screen = Gdk.Screen.get_default()
+		if not screen: raise core.StartupFailure('No X screen detected')
 		Gtk.StyleContext.add_provider_for_screen(
-			Gdk.Screen.get_default(), self._default_style,
+			screen, self._default_style,
 			Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION )
 
 

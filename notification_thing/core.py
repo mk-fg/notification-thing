@@ -11,6 +11,8 @@ from .rate_control import FC_TokenBucket, RRQ
 from . import __version__
 
 
+class StartupFailure(Exception): pass
+
 class Enum(dict):
 	def __init__(self, *keys, **kwz):
 		if not keys: super(Enum, self).__init__(**kwz)

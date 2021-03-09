@@ -809,11 +809,14 @@ def main(argv=None):
 		logger = FileLogger( os.path.expanduser(optz.log_file),
 			files=optz.log_rotate_files, size_limit=optz.log_rotate_size )
 
-	daemon = notification_daemon_factory( pubsub, logger, bus,
-		optz.dbus_path, dbus.service.BusName(optz.dbus_interface, bus) )
+	try:
+		daemon = notification_daemon_factory( pubsub, logger, bus,
+			optz.dbus_path, dbus.service.BusName(optz.dbus_interface, bus) )
+	except StartupFailure as err:
+		log.error('Failed to initialize the daemon: {}', err)
+		return 1
 	loop = GLib.MainLoop()
 	log.debug('Starting gobject loop')
 	loop.run()
-
 
 if __name__ == '__main__': sys.exit(main())
