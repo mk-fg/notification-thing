@@ -1,16 +1,11 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
-
-import itertools as it, operator as op, functools as ft
-from collections import deque
-from time import time, sleep
+import time, collections as cs
 
 
-class RRQ(deque): # round-robin queue
+class RRQ(cs.deque): # round-robin queue
 	dropped = 0
 	def __init__(self, limit):
 		self._limit = limit
-		super(RRQ, self).__init__()
+		super().__init__()
 	def _trim(self, size=None):
 		if size is None: size = self._limit
 		while len(self) > size:
@@ -25,9 +20,7 @@ class RRQ(deque): # round-robin queue
 	def flush(self):
 		self._trim(0)
 		self.dropped = 0
-	@property
-	def is_full(self):
-		return len(self) == self._limit
+	is_full = property(lambda s: len(self) == self._limit)
 
 
 FC_UNDEF = 0
@@ -35,7 +28,7 @@ FC_OK = 1
 FC_EMPTY = 2
 FC_STARVE = 4
 
-class FC_TokenBucket(object):
+class FC_TokenBucket:
 	'''Token bucket flow control mechanism implementation.
 
 		Essentially it behaves like a bucket of given capacity (burst),
@@ -62,10 +55,10 @@ class FC_TokenBucket(object):
 			tick (seconds): time unit of operation;
 			tick_strangle / tick_free:
 				hooks for consequent token shortage / availability,
-				can be either int/float/long or a function, accepting
+				can be either int/float or a function, accepting
 				current flow multiplier as a single argument;
 			start:
-				starting bucket size, either int/float/long or a function
+				starting bucket size, either int/float or a function
 				of bucket capacity.'''
 		self.fill_rate = flow
 		self.capacity = burst
@@ -73,10 +66,10 @@ class FC_TokenBucket(object):
 		self._tick = tick
 		self._tick_strangle = tick_strangle
 		self._tick_free = tick_free
-		self._synctime = time()
+		self._synctime = time.monotonic()
 
 	_mod = lambda s, method, val: \
-		method if isinstance(method, (int, float, long)) else method(s._tick_mul)
+		method if isinstance(method, (int, float)) else method(s._tick_mul)
 
 	def _flow_adjust(self):
 		tc = self.tokens # logic-independent update of the bucket
@@ -103,7 +96,7 @@ class FC_TokenBucket(object):
 	@property
 	def tokens(self):
 		'Number of tokens in the bucket at the moment'
-		ts = time()
+		ts = time.monotonic()
 		if self._tokens < self.capacity:
 			self._tokens = min( self.capacity,
 				self._tokens + self.fill_rate * (ts - self._synctime) / self.tick )
@@ -114,9 +107,9 @@ class FC_TokenBucket(object):
 		'Return amount of seconds until the given number of tokens will be available'
 		if count > self.capacity:
 			## TODO: Implement buffered grab for this case?
-			raise ValueError, ( 'Token bucket deadlock:'
-				' %s tokens requested, while max capacity is %s'%(count, self.capacity) )
-		return self.tick - time() % self.tick
+			raise ValueError( 'Token bucket deadlock:'
+				f' {count} tokens requested, while max capacity is {self.capacity}' )
+		return self.tick - time.monotonic() % self.tick
 
 	def consume(self, count=1, block=False, force=False):
 		'Take tokens from the bucket'
@@ -128,7 +121,7 @@ class FC_TokenBucket(object):
 			return True
 
 		elif block: # wait for tokens
-			sleep(self.get_eta(count))
+			time.sleep(self.get_eta(count))
 			self._spree |= FC_STARVE # to ensure the 'empty' set/check
 			return self.consume(count=count, block=block)
 

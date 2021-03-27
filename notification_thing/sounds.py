@@ -1,8 +1,4 @@
-# -*- coding: utf-8 -*-
-from __future__ import print_function
-
-import itertools as it, operator as op, functools as ft
-import os, sys, ctypes, time
+import os, sys, ctypes, time, itertools as it
 
 # http://0pointer.de/lennart/projects/libcanberra/gtkdoc/libcanberra-canberra.html
 
@@ -23,7 +19,7 @@ class NotificationSounds(object):
 		' toobig notfound destroyed canceled notavailable access io'
 		' internal disabled forked disconnected' ).split()))
 
-	ca_ids = iter(it.chain.from_iterable(it.imap(xrange, it.repeat(2**30))))
+	ca_ids = iter(it.chain.from_iterable(map(range, it.repeat(2**30))))
 	ca_props = set((
 		'application.icon application.icon_name application.id application.language'
 		' application.name application.process.binary application.process.host'
@@ -94,8 +90,8 @@ class NotificationSounds(object):
 
 	def _ctx_props(self, props_dict=None):
 		props_dict = props_dict or dict()
-		assert self.ca_props.issuperset(props_dict.viewkeys()), props_dict
-		props = list(it.chain.from_iterable(it.imap(bytes, t) for t in props_dict.viewitems()))
+		assert self.ca_props.issuperset(props_dict.keys()), props_dict
+		props = list(it.chain.from_iterable(map(str.encode, t) for t in props_dict.items()))
 		props.append(None)
 		return props
 

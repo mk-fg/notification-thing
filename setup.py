@@ -32,8 +32,7 @@ setup(
 		'License :: OSI Approved',
 		'Operating System :: POSIX',
 		'Programming Language :: Python',
-		'Programming Language :: Python :: 2.7',
-		'Programming Language :: Python :: 2 :: Only',
+		'Programming Language :: Python :: 3 :: Only',
 		'Topic :: Desktop Environment' ],
 
 	dependency_links = [

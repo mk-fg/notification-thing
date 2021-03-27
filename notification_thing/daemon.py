@@ -1,20 +1,16 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+#!/usr/bin/env python
 
-import itertools as it, operator as op, functools as ft
-from time import time
-from collections import Mapping
-from dbus.mainloop.glib import DBusGMainLoop
-import dbus, dbus.service
-import os, sys, traceback, types, math
+from dbus.mainloop.glib import DBusGMainLoop # XXX
+import collections as cs, itertools as it, operator as op, functools as ft
+import dbus, dbus.service # XXX
+import os, sys, traceback, math, time
 
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
 try: from gi.repository import GLib, Gdk
 except RuntimeError as err: # less verbose errors in case X isn't running
-	print('Gdk init error, exiting: {}'.format(err.message), file=sys.stderr)
+	print(f'Gdk init error, exiting: {err.message}', file=sys.stderr)
 	sys.exit(1)
 
 
@@ -41,9 +37,9 @@ optz, poll_interval, close_reasons, urgency_levels =\
 
 def flatten_dict(data, path=tuple()):
 	dst = list()
-	for k,v in data.iteritems():
+	for k,v in data.items():
 		k = path + (k,)
-		if isinstance(v, Mapping):
+		if isinstance(v, cs.abc.Mapping):
 			for v in flatten_dict(v, k): dst.append(v)
 		else: dst.append((k, v))
 	return dst
@@ -56,7 +52,7 @@ def ts_diff_format( seconds, add_ago=False,
 
 	res, d = list(), days
 	for unit, unit_days in sorted(
-			_units_days.iteritems(), key=op.itemgetter(1), reverse=True):
+			_units_days.items(), key=op.itemgetter(1), reverse=True):
 		if d > unit_days or res:
 			res.append('{0:.0f}{1}'.format(
 				math.floor(d / unit_days) if unit_days else d, unit ))
@@ -66,7 +62,7 @@ def ts_diff_format( seconds, add_ago=False,
 	if len(res) < 2:
 		s = seconds
 		for unit, unit_s in sorted(
-				_units_s.iteritems(), key=op.itemgetter(1), reverse=True):
+				_units_s.items(), key=op.itemgetter(1), reverse=True):
 			if s > unit_s or res:
 				res.append('{0:.0f}{1}'.format(s / unit_s if unit_s else s, unit))
 				if len(res) >= 2 or not unit_s: break
@@ -79,11 +75,18 @@ def ts_diff_format( seconds, add_ago=False,
 
 
 
-class NotificationMethods(object):
+class NotificationDaemon(dbus.service.Object):
+	dbus_props = dbus.PROPERTIES_IFACE
+	dbus_iface = 'org.freedesktop.Notifications'
+	dbus_path = '/org/freedesktop/Notifications'
+
 	plugged, timeout_cleanup = False, True
 	_activity_timer = None
 
-	def __init__(self, pubsub=None, logger=None):
+	def __init__(self, bus, pubsub=None, logger=None):
+		# super().__init__(bus, self.dbus_path)
+		dbus.service.Object.__init__( self, bus,
+			self.dbus_path, dbus.service.BusName(self.dbus_iface, bus) )
 		tick_strangle_max = op.truediv(optz.tbf_max_delay, optz.tbf_tick)
 		self._note_limit = core.FC_TokenBucket(
 			tick=optz.tbf_tick, burst=optz.tbf_size,
@@ -92,8 +95,7 @@ class NotificationMethods(object):
 		self._note_buffer = core.RRQ(optz.queue_len)
 		self._note_history = core.RRQ(optz.history_len)
 		self._note_windows = dict()
-		self._note_id_pool = it.chain.from_iterable(
-			it.imap(ft.partial(xrange, 1), it.repeat(2**30)) )
+		self._note_id_pool = it.chain.from_iterable(map(ft.partial(range, 1), it.repeat(2**30)))
 		self._renderer = NotificationDisplay(
 			optz.layout_margin, optz.layout_anchor, optz.layout_direction,
 			icon_scale=optz.icon_scale, markup_default=not optz.markup_disable,
@@ -118,24 +120,24 @@ class NotificationMethods(object):
 				.format(
 					host=os.uname()[1], v=core.__version__,
 					sound_color='green' if optz.filter_sound else 'red',
-					sound=unicode(bool(optz.filter_sound)).lower(),
+					sound=str(bool(optz.filter_sound)).lower(),
 					pubsub_color='green' if pubsub else 'red',
-					pubsub=unicode(bool(pubsub)).lower(),
+					pubsub=str(bool(pubsub)).lower(),
 					code=os.path.abspath(os.path.dirname(core.__file__)) )
 			if not self._renderer.markup_default:
-				summary, body = it.imap(strip_markup, [summary, body])
+				summary, body = map(strip_markup, [summary, body])
 			self.display(summary, body)
 		if optz.test_sound and optz.filter_sound: optz.filter_sound['play'](optz.test_sound)
 
 
 	def exit(self, reason=None):
-		log.debug('Exiting cleanly%s', ', reason: {}'.format(reason) if reason else '')
+		log.debug(f'Exiting cleanly%s', ', reason: {reason or ""}')
 		sys.exit()
 
 	def _activity_event(self, callback=False):
 		if callback:
 			if not self._note_windows:
-				self.exit(reason='activity timeout ({}s)'.format(optz.activity_timeout))
+				self.exit(reason=f'activity timeout ({optz.activity_timeout}s)')
 			else:
 				log.debug( 'Ignoring inacivity timeout event'
 					' due to existing windows (retry in %ss).', optz.activity_timeout )
@@ -146,10 +148,12 @@ class NotificationMethods(object):
 				optz.activity_timeout, self._activity_event, True )
 
 
+	@dbus.service.method(dbus_iface, '', 'ssss')
 	def GetServerInformation(self):
 		self._activity_event()
 		return 'notification-thing', 'mk.fraggod@gmail.com', 'git', '1.2'
 
+	@dbus.service.method(dbus_iface, '', 'as')
 	def GetCapabilities(self):
 		# action-icons, actions, body, body-hyperlinks, body-images,
 		#  body-markup, icon-multi, icon-static, persistence, sound
@@ -158,37 +162,41 @@ class NotificationMethods(object):
 		if not self._renderer.markup_default: caps.append('body-markup')
 		return sorted(caps)
 
+	@dbus.service.signal(dbus_iface, 'uu')
 	def NotificationClosed(self, nid, reason=None):
 		log.debug(
 			'NotificationClosed signal (id: %s, reason: %s)',
 			nid, close_reasons.by_id(reason) )
 
+	@dbus.service.signal(dbus_iface, 'us')
 	def ActionInvoked(self, nid, action_key):
 		log.debug('Um... some action invoked? Params: %s', [nid, action_key])
 
 
+	@dbus.service.method(dbus_props, 'ss', 'v')
 	def Get(self, iface, k):
 		return self.GetAll(iface)[k]
 
+	@dbus.service.method(dbus_props, 's', 'a{sv}')
 	def GetAll(self, iface):
 		if iface != self.dbus_interface:
 			raise dbus.exceptions.DBusException(
-				'This object does not implement the {!r} interface'.format(unicode(iface)) )
+				f'This object does not implement the {iface!r} interface' )
 		self._activity_event()
 		return dict( urgent=optz.urgency_check,
 			plug=self.plugged, cleanup=self.timeout_cleanup )
 
+	@dbus.service.method(dbus_props, 'ssv', '')
 	def Set(self, iface, k, v):
 		if iface != self.dbus_interface:
 			raise dbus.exceptions.DBusException(
-				'This object does not implement the {!r} interface'.format(unicode(iface)) )
+				f'This object does not implement the {iface!r} interface' )
 		self._activity_event()
 
-		if isinstance(v, types.StringTypes):
-			v = unicode(v)
-			if v == 'toggle': k, v = '{}_toggle'.format(k), True
+		if isinstance(v, str):
+			if v == 'toggle': k, v = f'{k}_toggle', True
 			elif v.lower() in {'n', 'no', 'false', 'disable', 'off', '-'}: v = False
-		k, v = unicode(k), bool(v)
+		k, v = str(k), bool(v)
 		if k.endswith('_toggle'):
 			k = k[:-7]
 			v = not self.Get(iface, k)
@@ -231,26 +239,30 @@ class NotificationMethods(object):
 
 		elif optz.status_notify:
 			self.display( 'notification-thing:'
-				' unrecognized parameter', 'Key: {!r}, value: {!r}'.format(k, v) )
+				' unrecognized parameter', f'Key: {k!r}, value: {v!r}' )
 			return
 
 		self.PropertiesChanged(iface, {k: v}, [])
 
+	@dbus.service.signal(dbus_props, 'sa{sv}as')
 	def PropertiesChanged(self, iface, props_changed, props_invalidated):
 		log.debug( 'PropertiesChanged signal: %s',
 			[iface, props_changed, props_invalidated] )
 
 
+	@dbus.service.method(dbus_iface, '', '')
 	def Flush(self):
 		log.debug('Manual flush of the notification buffer')
 		self._activity_event()
 		return self.flush(force=True)
 
+	@dbus.service.method(dbus_iface, '', '')
 	def List(self):
 		log.debug('NotificationList call')
 		self._activity_event()
-		return self._note_windows.keys()
+		return list(self._note_windows.keys())
 
+	@dbus.service.method(dbus_iface, '', 'u')
 	def Redisplay(self):
 		log.debug('Redisplay call')
 		self._activity_event()
@@ -258,13 +270,14 @@ class NotificationMethods(object):
 		note = self._note_history.pop()
 		return self.display(note, redisplay=True)
 
+	@dbus.service.method(dbus_iface, 'du', '')
 	def Cleanup(self, timeout, max_count):
 		log.debug( 'NotificationCleanup call'
 			' (timeout=%.1fs, max_count=%s)', timeout, max_count )
 		self._activity_event()
 		if max_count <= 0: max_count = None
-		ts_min = time() - timeout
-		for nid, note in sorted(self._note_windows.viewitems(), key=lambda t: t[1].created):
+		ts_min = time.time() - timeout
+		for nid, note in sorted(self._note_windows.items(), key=lambda t: t[1].created):
 			if note.created > ts_min: break
 			self.close(nid, reason=close_reasons.closed)
 			if max_count is not None:
@@ -279,15 +292,16 @@ class NotificationMethods(object):
 				if msg is None: break
 				self._activity_event()
 				note = msg.note
-				prefix, ts_diff = msg.hostname, time() - msg.ts
+				prefix, ts_diff = msg.hostname, time.time() - msg.ts
 				if ts_diff > 15 * 60: # older than 15min
-					prefix = '{}[{}]'.format(prefix, ts_diff_format(ts_diff))
-				note.summary = '{} // {}'.format(prefix, note.summary)
+					prefix = f'{prefix}[{ts_diff_format(ts_diff)}]'
+				note.summary = f'{prefix} // {note.summary}'
 				note.hints['x-nt-from-remote'] = msg.hostname
 				self.filter_display(note)
 		except: log.exception('Unhandled error with remote notification')
 		finally: return True # for glib to keep watcher
 
+	@dbus.service.method(dbus_iface, 'susssasa{sv}i', 'u')
 	def Notify(self, app_name, nid, icon, summary, body, actions, hints, timeout):
 		self._activity_event()
 		try:
@@ -304,6 +318,7 @@ class NotificationMethods(object):
 			log.exception('Unhandled error')
 			return 0
 
+	@dbus.service.method(dbus_iface, 'u', '')
 	def CloseNotification(self, nid):
 		log.debug('CloseNotification call (id: %s)', nid)
 		self._activity_event()
@@ -314,7 +329,7 @@ class NotificationMethods(object):
 	_filter_callback = None, 0
 
 	def _notification_check(self, summary, body):
-		(cb, mtime), ts = self._filter_callback, time()
+		(cb, mtime), ts = self._filter_callback, time.time()
 		if self._filter_ts_chk < ts - poll_interval:
 			self._filter_ts_chk = ts
 			try: ts = int(os.stat(optz.filter_file).st_mtime)
@@ -352,13 +367,14 @@ class NotificationMethods(object):
 
 	def _fullscreen_check(self, jitter=5):
 		screen = Gdk.Screen.get_default()
-		win = screen.get_active_window()
+		win = screen.get_active_window() # XXX: deprecated
 		if not win: return False
 		win_state = win.get_state()
 		w, h = win.get_width(), win.get_height()
 		# get_geometry fails with "BadDrawable" from X if the window is closing,
 		#  and x/y parameters there are not absolute and useful anyway.
 		# x, y, w, h = win.get_geometry()
+		# XXX: deprecated - screen.get_width() / screen.get_height()
 		return (win_state & win_state.FULLSCREEN)\
 			or (w >= screen.get_width() - jitter and h >= screen.get_height() - jitter)
 
@@ -436,9 +452,9 @@ class NotificationMethods(object):
 				if len(self._note_buffer) == 1\
 				else core.Notification.system_message(
 					'Feed' if not self._note_buffer.dropped
-						else 'Feed ({} dropped)'.format(self._note_buffer.dropped),
+						else 'Feed ({self._note_buffer.dropped} dropped)',
 					'\n\n'.join(it.starmap( '--- {}\n  {}'.format,
-						it.imap(op.itemgetter('summary', 'body'), self._note_buffer) )),
+						map(op.itemgetter('summary', 'body'), self._note_buffer) )),
 					app_name='notification-feed', icon=optz.feed_icon ) )
 			self._note_buffer.flush()
 			log.debug('Notification buffer flushed')
@@ -446,19 +462,19 @@ class NotificationMethods(object):
 
 	def display(self, note_or_summary, body='', redisplay=False):
 		if isinstance(note_or_summary, core.Notification):
-			if body:
-				raise TypeError('Either Notification object or summary/body should be passed, not both.')
+			if body: raise TypeError('Notification object or summary/body should be passed, not both.')
 			note = note_or_summary
 		else:
 			note = core.Notification.system_message(note_or_summary, body)
 
 		if not redisplay:
 			clone = note.clone()
-			clone.display_time = time()
+			clone.display_time = time.time()
 			self._note_history.append(clone)
 		else:
 			ts = getattr(note, 'display_time', None)
-			if ts: note.body += '\n\n[from {}]'.format(ts_diff_format(time() - ts, add_ago=True))
+			if ts: note.body += ( '\n\n[from '
+				f'{ts_diff_format(time.time() - ts, add_ago=True)}]' )
 
 		if note.replaces_id in self._note_windows:
 			self.close(note.replaces_id, close_reasons.closed)
@@ -473,7 +489,7 @@ class NotificationMethods(object):
 		self._note_windows[nid] = note
 
 		if self.timeout_cleanup and note.timeout > 0:
-			note.timer_created, note.timer_left = time(), note.timeout / 1000.0
+			note.timer_created, note.timer_left = time.time(), note.timeout / 1000.0
 			note.timer_id = GLib.timeout_add(
 				note.timeout, self.close, nid, close_reasons.expired )
 
@@ -495,9 +511,9 @@ class NotificationMethods(object):
 					if delay:
 						if note.timer_id:
 							note.timer_id, note.timer_left = None,\
-								note.timer_left - (time() - note.timer_created)
+								note.timer_left - (time.time() - note.timer_created)
 					else:
-						note.timer_created = time()
+						note.timer_created = time.time()
 						note.timer_id = GLib.timeout_add(
 							int(max(note.timer_left, 1) * 1000),
 							self.close, nid, close_reasons.expired )
@@ -512,51 +528,7 @@ class NotificationMethods(object):
 				else: self.NotificationClosed(nid, reason)
 
 		else: # close all of them
-			for nid in self._note_windows.keys(): self.close(nid, reason)
-
-
-
-def _add_dbus_decorators(cls_name, cls_parents, cls_attrs):
-	cls_attrs['dbus_interface'] = optz.dbus_interface
-	method, signal = dbus.service.method, dbus.service.signal
-	assert NotificationMethods in cls_parents
-	methods = vars(NotificationMethods)
-	# Main interface
-	for wrapper in [
-			(method, 'GetCapabilities', '', 'as'),
-			(method, 'GetServerInformation', '', 'ssss'),
-			(signal, 'NotificationClosed', 'uu'),
-			(signal, 'ActionInvoked', 'us'),
-			(method, 'Flush', '', ''),
-			(method, 'List', '', 'ai'),
-			(method, 'Redisplay', '', 'u'),
-			(method, 'Cleanup', 'du', ''),
-			(method, 'Notify', 'susssasa{sv}i', 'u'),
-			(method, 'CloseNotification', 'u', '') ]:
-		(wrapper, name), args = wrapper[:2], wrapper[2:]
-		cls_attrs[name] = wrapper(optz.dbus_interface, *args)(methods[name])
-	# Properties interface
-	for wrapper in [
-			(method, 'Get', 'ss', 'v'),
-			(method, 'GetAll', 's', 'a{sv}'),
-			(method, 'Set', 'ssv', ''),
-			(signal, 'PropertiesChanged', 'sa{sv}as') ]:
-		(wrapper, name), args = wrapper[:2], wrapper[2:]
-		cls_attrs[name] = wrapper(dbus.PROPERTIES_IFACE, *args)(methods[name])
-	return type(cls_name, cls_parents, cls_attrs)
-
-def notification_daemon_factory(*dbus_svc_argz, **dbus_svc_kwz):
-	'Build NotificationDaemon class on a configured dbus interface.'
-	# Necessary because dbus interface is embedded into method decorators,
-	#  so it's either monkey-patching of a global class or customized creation.
-
-	class NotificationDaemon(NotificationMethods, dbus.service.Object):
-		__metaclass__ = _add_dbus_decorators
-		def __init__(self, pubsub, logger, *dbus_svc_argz, **dbus_svc_kwz):
-			NotificationMethods.__init__(self, pubsub, logger)
-			dbus.service.Object.__init__(self, *dbus_svc_argz, **dbus_svc_kwz)
-
-	return NotificationDaemon(*dbus_svc_argz, **dbus_svc_kwz)
+			for nid in list(self._note_windows.keys()): self.close(nid, reason)
 
 
 
@@ -688,14 +660,6 @@ def main(argv=None):
 			' Can be full path to icon, local "file://..." url,'
 				' or name from xdg theme (e.g. "face-smile").')
 
-	group = parser.add_argument_group('DBus options')
-	group.add_argument('--dbus-interface',
-		default=optz['dbus_interface'], metavar='iface',
-		help='DBus interface to use (default: %(default)s)')
-	group.add_argument('--dbus-path',
-		default=optz['dbus_path'], metavar='path',
-		help='DBus object path to bind to (default: %(default)s)')
-
 	group = parser.add_argument_group('Network pub/sub options')
 	group.add_argument('--net-pub-bind',
 		action='append', metavar='ip:port',
@@ -743,7 +707,7 @@ def main(argv=None):
 			if v is None: continue
 			k = '_'.join(k).replace('-', '_')
 			if not hasattr(optz, k):
-				parser.error('Unrecognized option in config file ({}): {}'.format(optz.conf, k))
+				parser.error(f'Unrecognized option in config file ({optz.conf}): {k}')
 			setattr(optz, k, v)
 		optz = parser.parse_args(args, optz) # re-parse to override cli-specified values
 	for k in 'layout_anchor', 'layout_direction':
@@ -772,7 +736,7 @@ def main(argv=None):
 		optz.icon_scale['fixed'] = optz.icon_width, optz.icon_height
 	else:
 		for k in 'min', 'max':
-			v = getattr(optz, 'icon_size_{}'.format(k))
+			v = getattr(optz, f'icon_size_{k}')
 			if not v: continue
 			try:
 				if 'x' not in v: raise ValueError
@@ -780,8 +744,8 @@ def main(argv=None):
 				if v.startswith('x'): v = '0' + v
 				w, h = map(int, v.split('x'))
 			except:
-				parser.error( 'Invalid --icon-size-{}'
-					' value (must be in "[w]x[h]" format): {!r}'.format(k, v) )
+				parser.error( f'Invalid --icon-size-{k}'
+					f' value (must be in "[w]x[h]" format): {v!r}' )
 			optz.icon_scale[k] = w, h
 
 	DBusGMainLoop(set_as_default=True)
@@ -790,7 +754,7 @@ def main(argv=None):
 	pubsub = None
 	if optz.net_pub_bind or optz.net_pub_connect\
 			or optz.net_sub_bind or optz.net_sub_connect:
-		if optz.net_settings and not isinstance(optz.net_settings, Mapping):
+		if optz.net_settings and not isinstance(optz.net_settings, cs.abc.Mapping):
 			import yaml
 			optz.net_settings = yaml.safe_load(optz.net_settings)
 		pubsub = PubSub(**(optz.net_settings or dict()))
@@ -799,9 +763,9 @@ def main(argv=None):
 				(optz.net_sub_bind, pubsub.bind_sub),
 				(optz.net_pub_connect, pubsub.connect),
 				(optz.net_sub_connect, pubsub.subscribe) ]:
-			if isinstance(addrs, types.StringTypes): addrs = [addrs]
+			if isinstance(addrs, str): addrs = [addrs]
 			for addr in set(addrs or set()):
-				log.debug('zmq link: %s %s', call.im_func.func_name, addr)
+				log.debug('zmq-link: %s %s', call.__func__.__name__, addr)
 				call(addr)
 
 	logger = None
@@ -809,10 +773,8 @@ def main(argv=None):
 		logger = FileLogger( os.path.expanduser(optz.log_file),
 			files=optz.log_rotate_files, size_limit=optz.log_rotate_size )
 
-	try:
-		daemon = notification_daemon_factory( pubsub, logger, bus,
-			optz.dbus_path, dbus.service.BusName(optz.dbus_interface, bus) )
-	except StartupFailure as err:
+	try: daemon = NotificationDaemon(bus, pubsub, logger)
+	except core.StartupFailure as err:
 		log.error('Failed to initialize the daemon: {}', err)
 		return 1
 	loop = GLib.MainLoop()

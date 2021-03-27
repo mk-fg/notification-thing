@@ -58,52 +58,53 @@ Features:
 * All options/features are configurable and can be disabled entirely, either
   from command-line or a YAML configuration file.
 
-* Easy to change and debug - it's just a Python after all.
+* Easy to change and debug - it's just a python script.
 
 See below for a detailed description of each particular feature.
 
 Actual notification rendering is inspired (and based in part on)
-[notipy](https://github.com/the-isz/notipy) project.
+[notipy](https://gitlab.com/the_isz/notipy) project.
 
-I wrote a few extended notes on the project over time
+Wrote a few notes on the project a while ago when making it
 ([link1](http://blog.fraggod.net/2010/2/libnotify-notification-daemon-shortcomings-and-my-solution),
 [link2](http://blog.fraggod.net/2010/12/Further-improvements-on-notification-daemon),
 [link3](http://blog.fraggod.net/2011/8/Notification-daemon-in-python)), but
-these should be mostly summarized in this README.
+these should be mostly summarized in this README anyway.
+
+It's a somewhat old thing dating back to 2010 and python2, but I still use it myself.
 
 
 Installation
 --------------------
 
-It's a regular package for Python 2.7 (not 3.X), but not in pypi, so can be
-installed from a checkout with something like that:
+It's a regular package for Python 3.X, but not in pypi, so can be
+installed from a checkout with something like this:
 
 	% python setup.py install
 
-Better way would be to use [pip](http://pip-installer.org/) to install all the
-necessary dependencies as well:
+[pip](http://pip-installer.org/) can be used to install it from a repo URL:
 
-	% pip install 'git+https://github.com/mk-fg/notification-thing.git#egg=notification-thing'
+	% python -m pip install --user 'git+https://github.com/mk-fg/notification-thing.git#egg=notification-thing'
 
-Note that to install stuff in system-wide PATH and site-packages, elevated
-privileges are often required.
-Use "install --user",
-[~/.pydistutils.cfg](http://docs.python.org/install/index.html#distutils-configuration-files)
-or [virtualenv](http://pypi.python.org/pypi/virtualenv) to do unprivileged
-installs into custom paths.
+This will install module to `~/.local/lib/`, use
+[venv](https://docs.python.org/3/library/venv.html) module for a more
+isolated/portable installation into some custom path.
 
 Alternatively, `./notification-thing` can be run right from the checkout tree,
 without any installation.
 
 ### Requirements
 
-* [Python 2.7 (not 3.X)](http://python.org/).
-
-* [dbus-python](http://www.freedesktop.org/wiki/Software/DBusBindings#dbus-python).
+* [Python 3.X](http://python.org/).
 
 * [GObject-Introspection](https://live.gnome.org/GObjectIntrospection/)-enabled
   [Gtk+](http://www.gtk.org/) 3.X (including Glib, Pango) and
   [PyGObject](http://live.gnome.org/PyGObject).
+
+* [libdbus / dbus-python](https://www.freedesktop.org/wiki/Software/DBusBindings/#libdbuspartofdbus).
+
+	Leftover dep from old python2 days, GDBus GI wrappers should probably provide
+	all necessary daemon interfaces as well these days.
 
 * (optional) [PyYAML](http://pyyaml.org/) - to configure daemon via YAML file,
   not CLI (--conf option).

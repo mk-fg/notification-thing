@@ -1,10 +1,5 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
-
-import itertools as it, operator as op, functools as ft
-from collections import namedtuple, MutableMapping
-from time import time
-import dbus, argparse, re, logging, types
+import operator as op, functools as ft, collections as cs
+import dbus, argparse, re, logging, time
 
 from .scheme import load, init_env
 from .rate_control import FC_TokenBucket, RRQ
@@ -24,22 +19,23 @@ class Enum(dict):
 		if not k.startswith('__'): return self[k]
 		else: raise AttributeError
 	def by_id(self, v_chk):
-		for k,v in self.viewitems():
+		for k,v in self.items():
 			if v == v_chk: return k
 		else: raise KeyError(v_chk)
 
 
 def to_bytes(obj, encoding='utf-8', errors='backslashreplace'):
-	if not isinstance(obj, types.StringTypes): obj = bytes(obj)
-	elif not isinstance(obj, bytes): obj = obj.encode(encoding, errors)
+	if not isinstance(obj, (str, bytes)): obj = str(obj)
+	if isinstance(obj, str): obj = obj.encode(encoding, errors)
 	return obj
 
 def to_str(obj, encoding='utf-8', errors='replace'):
-	if not isinstance(obj, types.StringTypes): obj = bytes(obj)
+	# XXX: probably don't need these checks/convs in most places with py3
+	if not isinstance(obj, (str, bytes)): obj = str(obj)
 	if isinstance(obj, bytes): obj = obj.decode(encoding, errors)
 	return obj
 
-def format_trunc(v, proc=to_bytes, len_max=None):
+def format_trunc(v, proc=to_str, len_max=None):
 	try:
 		v = proc(v)
 		if len_max is None: len_max = 1024 # len_max_default
@@ -59,8 +55,8 @@ def repr_trunc_rec(v, len_max=None, len_max_val=None, level=1):
 	if len_max_val is None: len_max_val = 512 # len_max_default
 	rec = ft.partial( repr_trunc_rec,
 		len_max=len_max, len_max_val=len_max_val, level=level-1 )
-	if isinstance(v, dict): v = dict((k, rec(v)) for k,v in v.viewitems())
-	elif isinstance(v, (tuple, list)): v = map(rec, v)
+	if isinstance(v, dict): v = dict((k, rec(v)) for k,v in v.items())
+	elif isinstance(v, (tuple, list)): v = list(map(rec, v))
 	else: return format_trunc(v, len_max=len_max_val)
 	return repr_trunc(v, len_max=len_max)
 
@@ -70,8 +66,7 @@ def repr_trunc_rec(v, len_max=None, len_max_val=None, level=1):
 optz = dict(
 	activity_timeout=10*60, popup_timeout=5,
 	queue_len=10, history_len=200, feed_icon=None,
-	tbf_size=4, tbf_tick=15, tbf_max_delay=60, tbf_inc=2, tbf_dec=2,
-	dbus_interface='org.freedesktop.Notifications', dbus_path='/org/freedesktop/Notifications' )
+	tbf_size=4, tbf_tick=15, tbf_max_delay=60, tbf_inc=2, tbf_dec=2 )
 poll_interval = 60
 
 urgency_levels = Enum('low', 'normal', 'critical')
@@ -83,7 +78,7 @@ layout_direction = Enum('horizontal', 'vertical')
 ####
 
 
-class Notification(MutableMapping):
+class Notification(cs.UserDict):
 
 	data = created = None
 
@@ -96,7 +91,7 @@ class Notification(MutableMapping):
 	@classmethod
 	def from_dbus(cls, *argz):
 		'Get all arguments in dbus-interface order.'
-		return cls(**dict(it.izip(cls.dbus_args, argz)))
+		return cls(**dict(zip(cls.dbus_args, argz)))
 
 	@classmethod
 	def system_message(cls, *argz, **kwz):
@@ -106,10 +101,10 @@ class Notification(MutableMapping):
 
 	def __init__( self, summary='', body='', timeout=-1, icon='', app_name='generic',
 			replaces_id=dbus.UInt32(), actions=dbus.Array(signature='s'), hints=dict(), plain=None ):
-		self.created = time()
+		self.created = time.time() # XXX: monotonic
 		if timeout == -1: timeout = self.default_timeout # yes, -1 is special-case value in specs
 		elif timeout is None: timeout = -1 # to be serialized or whatever
-		self.data = dict(it.izip(self.init_args, op.itemgetter(*self.init_args)(locals())))
+		self.data = dict(zip(self.init_args, op.itemgetter(*self.init_args)(locals())))
 
 	def __iter__(self):
 		return iter(op.itemgetter(*self.dbus_args)(self.data))
@@ -134,7 +129,7 @@ class Notification(MutableMapping):
 	def clone(self): return Notification(**self.data)
 
 # As serialized for pubsub transport
-NotificationMessage = namedtuple('NotificationMessage', 'hostname ts note')
+NotificationMessage = cs.namedtuple('NotificationMessage', 'hostname ts note')
 
 
 _scheme_init = False
@@ -172,6 +167,6 @@ def get_sound_env(force_sync=False, trap_errors=False):
 			except NSoundError as err:
 				if not trap_errors:
 					log.exception('Failed to play sound sample %r: %s', name, err)
-		res = dict((k, ft.partial(snd, k)) for k in b'play play_sync cache'.split())
+		res = dict((k, ft.partial(snd, k)) for k in 'play play_sync cache'.split())
 		if force_sync: res['play'] = res['play_sync']
 		return res

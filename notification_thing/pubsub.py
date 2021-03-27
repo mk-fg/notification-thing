@@ -1,9 +1,4 @@
-# -*- coding: utf-8 -*-
-from __future__ import print_function
-
-import itertools as it, operator as op, functools as ft
-from time import time
-import os, sys, types, re
+import os, sys, re, time, functools as ft
 
 from .core import Notification, NotificationMessage
 
@@ -17,19 +12,19 @@ class PubSub(object):
 
 
 	def __init__( self, hostname=None, peer_id=None,
-			buffer=30, blocking_send=False, reconnect_max=300.0 ):
+			buff_len=30, blocking_send=False, reconnect_max=300.0 ):
 		'''Opts:
 			hostname - name to send to peer along with the message as "source".
 				uname is used by default.
 			peer_id - zmq id of this peer's sockets.
 				Derived from machine-id, dbus id or uname by default.
-			buffer - zmq hwm value for pub socket - how many
+			buff_len - zmq hwm value for pub socket - how many
 				messages to keep buffered for each connected peer before dropping.
 			blocking_send - use dealer socket type to kinda-reliably
 					deliver message(s) to all connected peers with specified timeout.
 				Should be float of seconds to linger on close, attempting to deliver stuff.
 			reconnect_max - max interval between peer reconnection attempts.'''
-		self.hostname, self.buffer = hostname or os.uname()[1], buffer
+		self.hostname, self.buff_len = hostname or os.uname()[1], buff_len
 		if blocking_send:
 			raise NotImplementedError('blocking_send option does not work properly at the moment.')
 		self.blocking_send = blocking_send
@@ -63,14 +58,14 @@ class PubSub(object):
 			zmq.PUB if not self.blocking_send else zmq.DEALER )
 		self.sub = self.ctx.socket(zmq.SUB)
 		for sock in self.pub, self.sub:
-			sock.setsockopt(zmq.IDENTITY, self.peer_id)
+			sock.setsockopt_string(zmq.IDENTITY, self.peer_id)
 			sock.setsockopt(zmq.IPV4ONLY, False)
 			if reconnect_max is not None:
 				sock.setsockopt(zmq.RECONNECT_IVL_MAX, int(reconnect_max * 1000))
-		self.sub.setsockopt(zmq.SUBSCRIBE, '')
+		self.sub.setsockopt_string(zmq.SUBSCRIBE, '')
 		self.pub.setsockopt( zmq.LINGER,
 			0 if not self.blocking_send else int(self.blocking_send * 1000) )
-		self.pub.setsockopt(zmq.SNDHWM, self.buffer)
+		self.pub.setsockopt(zmq.SNDHWM, self.buff_len)
 
 	def __del__(self):
 		self.close()
@@ -119,19 +114,20 @@ class PubSub(object):
 		#  yet don't serialize in the same way - e.g. str(dbus.Byte(1)) is '\x01'
 		#  (and not '1') - which messes up simple serializers like "json" module.
 		sdt = self.strip_dbus_types
-		if isinstance(data, dict): return dict((sdt(k), sdt(v)) for k,v in data.viewitems())
-		elif isinstance(data, (list, tuple)): return map(sdt, data)
-		elif isinstance(data, types.NoneType): return data
-		for t in int, long, unicode, bytes, bool, float:
+		if isinstance(data, dict): return dict((sdt(k), sdt(v)) for k,v in data.items())
+		elif isinstance(data, (list, tuple)): return list(map(sdt, data))
+		elif data is None: return data
+		for t in int, str, bytes, bool, float:
 			if isinstance(data, t): return t(data)
 		raise ValueError(( 'Failed to sanitize data type:'
 			' {} (mro: {}, value: {})' ).format(type(data), type(data).mro(), data))
 
 	def encode(self, note):
 		data = self.strip_dbus_types(note.data)
-		return chr(self.protocol_version) + self.dumps([self.hostname, time(), data])
+		return chr(self.protocol_version) + self.dumps([self.hostname, time.time(), data])
 
 	def decode(self, msg):
+		msg = msg.decode()
 		if ord(msg[0]) > self.protocol_version: return
 		hostname, ts, note_data = self.loads(msg[1:])
 		return NotificationMessage(hostname, ts, Notification(**note_data))
@@ -141,7 +137,7 @@ class PubSub(object):
 		assert isinstance(note, Notification), note
 		msg = self.encode(note)
 		# pub shouldn't block, but just to be safe
-		try: self.pub.send(msg, self.zmq.DONTWAIT)
+		try: self.pub.send_string(msg, self.zmq.DONTWAIT)
 		except self.zmq.ZMQError as err:
 			if err.errno != self.zmq.EAGAIN: raise
 

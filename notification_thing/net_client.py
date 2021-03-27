@@ -1,8 +1,6 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+#!/usr/bin/env python
 
-import itertools as it, operator as op, functools as ft
+
 from contextlib import closing
 from time import sleep
 import os, sys

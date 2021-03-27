@@ -1,11 +1,6 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
-
 import itertools as it, operator as op, functools as ft
-from collections import OrderedDict, namedtuple, defaultdict
 from xml.sax.saxutils import escape as xml_escape
-import sgmllib
-import os, urllib, re, types
+import os, re, sgmllib, collections as cs, urllib.request as ulr
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -40,7 +35,7 @@ class NotificationDisplay(object):
 			methods and NoWindowError(nid) exception, raised on erroneous nid's in close().
 		Current implementation based on notipy: git://github.com/the-isz/notipy.git'''
 
-	window = namedtuple('Window', 'gobj event_boxes')
+	window = cs.namedtuple('Window', 'gobj event_boxes')
 	base_css = b'''
 		#notification { background: transparent; }
 		#notification #frame { background-color: #d4ded8; padding: 3px; }
@@ -67,14 +62,14 @@ class NotificationDisplay(object):
 			markup_default=False, markup_warn=False, markup_strip=False ):
 		self.margins = dict(it.chain.from_iterable(map(
 			lambda ax: ( (2**ax, layout_margin),
-				(-2**ax, layout_margin) ), xrange(2) )))
+				(-2**ax, layout_margin) ), range(2) )))
 		self.layout_anchor = layout_anchor
 		self.layout_direction = layout_direction
 		self.icon_scale = icon_scale
 		self.markup_default = markup_default
 		self.markup_warn, self.markup_strip = markup_warn, markup_strip
 
-		self._windows = OrderedDict()
+		self._windows = dict()
 
 		self._default_style = self._get_default_css()
 		screen = Gdk.Screen.get_default()
@@ -103,7 +98,7 @@ class NotificationDisplay(object):
 
 	def _get_default_css(self):
 		css, base_css = Gtk.CssProvider(), self.base_css
-		for attempt in xrange(6):
+		for attempt in range(6):
 			try: css.load_from_data(base_css)
 			except GLib.GError as err:
 				log.warn('Failed to load default CSS style (try %s): %s', attempt+1, err)
@@ -127,25 +122,25 @@ class NotificationDisplay(object):
 		base = tuple(map(
 			lambda ax, gdk_dim=('width', 'height'):\
 				(getattr(Gdk.Screen, gdk_dim[ax])() - self.margins[2**ax])\
-					if 2**ax & self.layout_anchor else self.margins[-2**ax], xrange(2) ))
+					if 2**ax & self.layout_anchor else self.margins[-2**ax], range(2) ))
 		# Iterate over windows in order, placing each one starting from a "base" corner
-		for win in map(op.attrgetter('gobj'), self._windows.viewvalues()):
+		for win in map(op.attrgetter('gobj'), self._windows.values()):
 			win.move(*map(lambda ax: base[ax] - ( win.get_size()[ax]
-				if 2**ax & self.layout_anchor else 0 ), xrange(2)))
+				if 2**ax & self.layout_anchor else 0 ), range(2)))
 			margin = self.margins[(2 * ( (2**self.layout_direction)
 				& self.layout_anchor ) / 2**self.layout_direction - 1) * 2**self.layout_direction]
 			base = tuple(map(
 				lambda ax: base[ax] if self.layout_direction != ax else\
 					base[ax] + (margin + win.get_size()[ax])\
-						* (2 * (2**ax ^ (2**ax & self.layout_anchor)) / 2**ax - 1), xrange(2) ))
+						* (2 * (2**ax ^ (2**ax & self.layout_anchor)) / 2**ax - 1), range(2) ))
 
 
 	def _get_icon(self, icon, remote=False):
 		widget_icon = None
 
 		if icon is not None:
-			if isinstance(icon, types.StringTypes):
-				icon_path = os.path.expanduser(urllib.url2pathname(icon))
+			if isinstance(icon, str):
+				icon_path = os.path.expanduser(ulr.url2pathname(icon))
 				if icon_path.startswith('file://'): icon_path = icon_path[7:]
 				if os.path.isfile(icon_path):
 					widget_icon = GdkPixbuf.Pixbuf.new_from_file(icon_path)
@@ -164,7 +159,7 @@ class NotificationDisplay(object):
 								' does not have that one), ignoring it: %r', core.format_trunc(icon) )
 			else:
 				w, h, rowstride, has_alpha, bits_per_sample, channels, data = icon
-				data = bytes(bytearray(data))
+				data = bytes(bytearray(data)) # XXX: test if still works
 				widget_icon = GdkPixbuf.Pixbuf.new_from_data(
 					data, GdkPixbuf.Colorspace.RGB, bool(has_alpha),
 					int(bits_per_sample), int(w), int(h), int(rowstride) )

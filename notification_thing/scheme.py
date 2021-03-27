@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals, print_function
-
 import itertools as it, operator as op, functools as ft
 
 ## Very simple embedded scheme
@@ -12,9 +9,9 @@ global_env = macro_table = symbol_table = None
 
 ################ Symbol, Procedure, classes
 
-import re, sys, types, StringIO
+import re, sys, io
 
-class Symbol(unicode): pass
+class Symbol(str): pass
 
 def Sym(s):
 	'Find or create unique Symbol entry for str s in symbol table.'
@@ -29,7 +26,6 @@ class Procedure(object):
 		return eval(self.exp, Env(self.parms, args, self.env))
 
 isa = isinstance
-str = types.StringTypes
 
 
 ################ parse, read, and user interaction
@@ -37,7 +33,7 @@ str = types.StringTypes
 def parse(inport):
 	'Parse a program: read and expand/error-check it.'
 	# Backwards compatibility: given a str, convert it to an InPort
-	if isa(inport, str): inport = InPort(StringIO.StringIO(inport))
+	if isa(inport, str): inport = InPort(io.StringIO(inport))
 	return expand(read(inport), toplevel=True)
 
 eof_object = Symbol('#<eof-object>') # Note: uninterned; can't be read
@@ -84,7 +80,7 @@ def atom(token):
 	'Numbers become numbers; #t and #f are booleans; "..." string; otherwise Symbol.'
 	if token == '#t': return True
 	elif token == '#f': return False
-	elif token[0] == '"': return token[1:-1].decode('string_escape')
+	elif token[0] == '"': return token[1:-1]
 	try: return int(token)
 	except ValueError:
 		try: return float(token)
@@ -99,9 +95,9 @@ def to_string(x):
 	elif x is False: return "#f"
 	elif isa(x, Symbol): return x
 	elif isa(x, str): return '"{}"'.format(x.encode('string_escape').replace('"',r'\"'))
-	elif isa(x, list): return '('+' '.join(it.imap(to_string, x))+')'
-	elif isa(x, complex): return unicode(x).replace('j', 'i')
-	else: return unicode(x)
+	elif isa(x, list): return '('+' '.join(map(to_string, x))+')'
+	elif isa(x, complex): return str(x).replace('j', 'i')
+	else: return str(x)
 
 def load(filename):
 	'Eval every expression from a file.'
@@ -163,8 +159,8 @@ def add_globals(self):
 	self.update(vars(math))
 	self.update(vars(cmath))
 	self.update({
-		'+':lambda *a:reduce(op.add, a[1:], a[0]),
-		'-':op.sub, '*':op.mul, '/':op.div, 'not':op.not_,
+		'+':lambda *a:ft.reduce(op.add, a[1:], a[0]),
+		'-':op.sub, '*':op.mul, '/':op.truediv, 'not':op.not_,
 		'>':op.gt, '<':op.lt, '>=':op.ge, '<=':op.le, '=':op.eq,
 		'equal?':op.eq, 'eq?':op.is_, 'length':len, 'cons':cons,
 		'car':lambda x:x[0], 'cdr':lambda x:x[1:], 'append':op.add,
@@ -218,7 +214,7 @@ def eval(x, env=None):
 				try: return proc(*exps)
 				except:
 					print('Call failed: {} ({})'.format( proc,
-						', '.join(it.imap(repr, exps)), file=sys.stderr ))
+						', '.join(map(repr, exps)), file=sys.stderr ))
 					raise
 
 
@@ -235,7 +231,7 @@ def expand(x, toplevel=False):
 	elif x[0] is _if:
 		if len(x)==3: x = x + [None] # (if t c) => (if t c None)
 		require(x, len(x)==4)
-		return map(expand, x)
+		return list(map(expand, x))
 	elif x[0] is _set:
 		require(x, len(x)==3);
 		var = x[1] # (set non-var exp) => Error
@@ -274,7 +270,7 @@ def expand(x, toplevel=False):
 	elif isa(x[0], Symbol) and x[0] in macro_table:
 		return expand(macro_table[x[0]](*x[1:]), toplevel) # (m arg...)
 	else: # => macroexpand if m isa macro
-		return map(expand, x) # (f arg...) => expand each
+		return list(map(expand, x)) # (f arg...) => expand each
 
 def require(x, predicate, msg='wrong length'):
 	'Signal a syntax error if predicate is false.'
@@ -303,7 +299,7 @@ def let(*args):
 	require(x, all( isa(b, list) and len(b)==2
 		and isa(b[0], Symbol) for b in bindings ), 'illegal binding list')
 	vars, vals = zip(*bindings)
-	return [[_lambda, list(vars)]+map(expand, body)] + map(expand, vals)
+	return [[_lambda, list(vars)]+list(map(expand, body))] + list(map(expand, vals))
 
 
 ## Interpreter setup
@@ -314,13 +310,13 @@ def init_env(env_ext=dict()):
 
 	global_env = add_globals(Env())
 	global _quote, _if, _set, _define, _lambda, _begin, _definemacro
-	_quote, _if, _set, _define, _lambda, _begin, _definemacro = it.imap(
+	_quote, _if, _set, _define, _lambda, _begin, _definemacro = map(
 		Sym, ['quote', 'if', 'set', 'define', 'lambda', 'begin', 'define-macro'] )
 	global _quasiquote, _unquote, _unquotesplicing
-	_quasiquote, _unquote, _unquotesplicing = it.imap(
+	_quasiquote, _unquote, _unquotesplicing = map(
 		Sym, ['quasiquote', 'unquote', 'unquote-splicing'] )
 	global _append, _cons, _let, quotes
-	_append, _cons, _let = it.imap(Sym, ['append', 'cons', 'let'])
+	_append, _cons, _let = map(Sym, ['append', 'cons', 'let'])
 	quotes = {"'":_quote, '`':_quasiquote, ',':_unquote, ',@':_unquotesplicing}
 
 	macro_table = {_let:let}
@@ -336,4 +332,4 @@ def init_env(env_ext=dict()):
 				`(if ,(car args) ,(car args) (or ,@(cdr args)))))))
 	)''')
 
-	for sym,val in env_ext.iteritems(): global_env[Sym(sym)] = val
+	for sym,val in env_ext.items(): global_env[Sym(sym)] = val
