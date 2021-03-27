@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
-from dbus.mainloop.glib import DBusGMainLoop # XXX
 import collections as cs, itertools as it, operator as op, functools as ft
-import dbus, dbus.service # XXX
 import os, sys, traceback, math, time
+
+from dbus.mainloop.glib import DBusGMainLoop
+import dbus, dbus.service
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -276,7 +277,7 @@ class NotificationDaemon(dbus.service.Object):
 			' (timeout=%.1fs, max_count=%s)', timeout, max_count )
 		self._activity_event()
 		if max_count <= 0: max_count = None
-		ts_min = time.time() - timeout
+		ts_min = time.monotonic() - timeout
 		for nid, note in sorted(self._note_windows.items(), key=lambda t: t[1].created):
 			if note.created > ts_min: break
 			self.close(nid, reason=close_reasons.closed)
@@ -329,7 +330,7 @@ class NotificationDaemon(dbus.service.Object):
 	_filter_callback = None, 0
 
 	def _notification_check(self, summary, body):
-		(cb, mtime), ts = self._filter_callback, time.time()
+		(cb, mtime), ts = self._filter_callback, time.monotonic()
 		if self._filter_ts_chk < ts - poll_interval:
 			self._filter_ts_chk = ts
 			try: ts = int(os.stat(optz.filter_file).st_mtime)
@@ -367,14 +368,14 @@ class NotificationDaemon(dbus.service.Object):
 
 	def _fullscreen_check(self, jitter=5):
 		screen = Gdk.Screen.get_default()
-		win = screen.get_active_window() # XXX: deprecated
+		win = screen.get_active_window() # deprecated, but still useful
 		if not win: return False
 		win_state = win.get_state()
 		w, h = win.get_width(), win.get_height()
 		# get_geometry fails with "BadDrawable" from X if the window is closing,
 		#  and x/y parameters there are not absolute and useful anyway.
 		# x, y, w, h = win.get_geometry()
-		# XXX: deprecated - screen.get_width() / screen.get_height()
+		# screen.get_width() / screen.get_height() are deprecated
 		return (win_state & win_state.FULLSCREEN)\
 			or (w >= screen.get_width() - jitter and h >= screen.get_height() - jitter)
 
@@ -386,7 +387,9 @@ class NotificationDaemon(dbus.service.Object):
 		except (KeyError, ValueError): urgency = None
 
 		if self.logger and (filter_pass or optz.log_filtered):
-			try: self.logger.write(note_summary, note_body, urgency=urgency, ts=note.created)
+			try:
+				self.logger.write( note_summary, note_body,
+					urgency=urgency, ts=time.time() - (time.monotonic() - note.created) )
 			except:
 				ex = traceback.format_exc()
 				log.debug('Notification logger failed:\n%s', ex)
@@ -469,12 +472,12 @@ class NotificationDaemon(dbus.service.Object):
 
 		if not redisplay:
 			clone = note.clone()
-			clone.display_time = time.time()
+			clone.display_time = time.monotonic()
 			self._note_history.append(clone)
 		else:
 			ts = getattr(note, 'display_time', None)
 			if ts: note.body += ( '\n\n[from '
-				f'{ts_diff_format(time.time() - ts, add_ago=True)}]' )
+				f'{ts_diff_format(time.monotonic() - ts, add_ago=True)}]' )
 
 		if note.replaces_id in self._note_windows:
 			self.close(note.replaces_id, close_reasons.closed)
@@ -489,7 +492,7 @@ class NotificationDaemon(dbus.service.Object):
 		self._note_windows[nid] = note
 
 		if self.timeout_cleanup and note.timeout > 0:
-			note.timer_created, note.timer_left = time.time(), note.timeout / 1000.0
+			note.timer_created, note.timer_left = time.monotonic(), note.timeout / 1000.0
 			note.timer_id = GLib.timeout_add(
 				note.timeout, self.close, nid, close_reasons.expired )
 
@@ -511,9 +514,9 @@ class NotificationDaemon(dbus.service.Object):
 					if delay:
 						if note.timer_id:
 							note.timer_id, note.timer_left = None,\
-								note.timer_left - (time.time() - note.timer_created)
+								note.timer_left - (time.monotonic() - note.timer_created)
 					else:
-						note.timer_created = time.time()
+						note.timer_created = time.monotonic()
 						note.timer_id = GLib.timeout_add(
 							int(max(note.timer_left, 1) * 1000),
 							self.close, nid, close_reasons.expired )

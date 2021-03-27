@@ -1,10 +1,6 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals, print_function
+#!/usr/bin/env python
 
-import itertools as it, operator as op, functools as ft
-from contextlib import closing
-from time import sleep
+import operator as op, contextlib as cl
 import os, sys, select, time
 
 if __name__ == '__main__':
@@ -32,8 +28,8 @@ def main(args=None):
 	logging.basicConfig(level=logging.DEBUG if opts.debug else logging.WARNING)
 	log = logging.getLogger()
 
-	with closing(PubSub()) as sub:
-		if opts.bind.isdigit(): opts.bind = '[::]:{}'.format(opts.bind)
+	with cl.closing(PubSub()) as sub:
+		if opts.bind.isdigit(): opts.bind = f'[::]:{opts.bind}'
 		sub.bind_sub(opts.bind)
 		s = select.epoll()
 		s.register(sub.fileno(), select.POLLIN | select.POLLPRI)
@@ -48,11 +44,11 @@ def main(args=None):
 					if msg.note.get('plain'): summary, body = msg.note.plain
 					else: summary, body = op.itemgetter('summary', 'body')(msg.note)
 					print('Message:\n  {}\n'.format('\n  '.join([
-						'Host: {}'.format(msg.hostname),
+						f'Host: {msg.hostname}',
 						'Timestamp: {}'.format(time.strftime(
 							'%Y-%m-%d %H:%M:%S', time.localtime(msg.ts) )),
-						'Summary: {}'.format(summary),
-						'Body:\n{}'.format('\n'.join(it.imap('    {}'.format, body.split('\n')))) ])))
+						f'Summary: {summary}',
+						'Body:\n{}'.format('\n'.join(map('    {}'.format, body.split('\n')))) ])))
 				else: print(msg.strip())
 
 	log.debug('Finished')

@@ -29,7 +29,7 @@ class MarkupToText(sgmllib.SGMLParser):
 strip_markup = MarkupToText()
 
 
-class NotificationDisplay(object):
+class NotificationDisplay:
 	'''Interface to display notification stack.
 		Should have "display(note, cb_dismiss=None) -> nid(UInt32, >0)", "close(nid)"
 			methods and NoWindowError(nid) exception, raised on erroneous nid's in close().
@@ -86,9 +86,9 @@ class NotificationDisplay(object):
 		except GLib.GError as err:
 			success = False # should be rendered as text
 			if self.markup_warn:
-				msg_start = '{}Pango formatting failed'.format(_err_mark)
+				msg_start = f'{_err_mark}Pango formatting failed'
 				if msg_start not in text: # detect and avoid possible feedback loops
-					log.warn('%s (%s) for text, stripping markup: %r', msg_start, core.to_str(err), text)
+					log.warn('%s (%s) for text, stripping markup: %r', msg_start, err, text)
 			if self.markup_strip: # strip + re-parse to convert xml entities and such
 				text = strip_markup(text)
 				try: _, _, text, _ = Pango.parse_markup(text, -1, '\0')
@@ -159,7 +159,7 @@ class NotificationDisplay(object):
 								' does not have that one), ignoring it: %r', core.format_trunc(icon) )
 			else:
 				w, h, rowstride, has_alpha, bits_per_sample, channels, data = icon
-				data = bytes(bytearray(data)) # XXX: test if still works
+				data = bytes(bytearray(data))
 				widget_icon = GdkPixbuf.Pixbuf.new_from_data(
 					data, GdkPixbuf.Colorspace.RGB, bool(has_alpha),
 					int(bits_per_sample), int(w), int(h), int(rowstride) )

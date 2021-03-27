@@ -30,7 +30,6 @@ def to_bytes(obj, encoding='utf-8', errors='backslashreplace'):
 	return obj
 
 def to_str(obj, encoding='utf-8', errors='replace'):
-	# XXX: probably don't need these checks/convs in most places with py3
 	if not isinstance(obj, (str, bytes)): obj = str(obj)
 	if isinstance(obj, bytes): obj = obj.decode(encoding, errors)
 	return obj
@@ -39,7 +38,7 @@ def format_trunc(v, proc=to_str, len_max=None):
 	try:
 		v = proc(v)
 		if len_max is None: len_max = 1024 # len_max_default
-		if len(v) > len_max: v = v[:len_max] + type(v)('... (len: {})'.format(len(v)))
+		if len(v) > len_max: v = v[:len_max] + type(v)(f'... (len: {len(v)})')
 	except Exception as err:
 		logging.getLogger('core.strings')\
 			.exception('Failed to process string %r: %s', v, err)
@@ -101,7 +100,7 @@ class Notification(cs.UserDict):
 
 	def __init__( self, summary='', body='', timeout=-1, icon='', app_name='generic',
 			replaces_id=dbus.UInt32(), actions=dbus.Array(signature='s'), hints=dict(), plain=None ):
-		self.created = time.time() # XXX: monotonic
+		self.created = time.monotonic()
 		if timeout == -1: timeout = self.default_timeout # yes, -1 is special-case value in specs
 		elif timeout is None: timeout = -1 # to be serialized or whatever
 		self.data = dict(zip(self.init_args, op.itemgetter(*self.init_args)(locals())))
@@ -123,8 +122,7 @@ class Notification(cs.UserDict):
 	def __delitem__(self, k): del self.data[k]
 
 	def __repr__(self):
-		return '<Notification[{:x}] summary={!r} body={!r}>'\
-			.format(id(self), self.summary, self.body)
+		return f'<Notification[{id(self):x}] summary={self.summary!r} body={self.body!r}>'
 
 	def clone(self): return Notification(**self.data)
 
@@ -147,7 +145,7 @@ def get_filter(path, sound_env=None):
 
 def get_sound_env(force_sync=False, trap_errors=False):
 	assert not _scheme_init # must be initialized before scheme env
-	# XXX: pass window position and allow configuration of canberra props
+	# Can pass window position and allow configuration of canberra props here
 	from .sounds import NotificationSounds, NSoundError, NSoundInitError
 	log = logging.getLogger('core.sound')
 	try:

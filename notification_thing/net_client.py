@@ -77,10 +77,10 @@ def main(args=None):
 		except ValueError:
 			try: urgency = getattr(urgency_levels, opts.urgency)
 			except AttributeError:
-				parser.error('Unrecognized urgency level name: {}'.format(opts.urgency))
+				parser.error(f'Unrecognized urgency level name: {opts.urgency}')
 		else:
 			if not 0 <= urgency <= 2:
-				parser.error('Urgency level id must be in 0-2 range: {}'.format(opts.urgency))
+				parser.error(f'Urgency level id must be in 0-2 range: {opts.urgency}')
 		note.hints['urgency'] = urgency
 	if opts.category: note.hints['category'] = ','.join(opts.category)
 	if opts.hint: raise NotImplementedError(opts.hint)

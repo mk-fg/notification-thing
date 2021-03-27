@@ -18,7 +18,7 @@ def Sym(s):
 	if s not in symbol_table: symbol_table[s] = Symbol(s)
 	return symbol_table[s]
 
-class Procedure(object):
+class Procedure:
 	'A user-defined Scheme procedure.'
 	def __init__(self, parms, exp, env):
 		self.parms, self.exp, self.env = parms, exp, env
@@ -38,7 +38,7 @@ def parse(inport):
 
 eof_object = Symbol('#<eof-object>') # Note: uninterned; can't be read
 
-class InPort(object):
+class InPort:
 	'An input port. Retains a line of chars.'
 	tokenizer = r"""\s*(,@|[('`,)]|"(?:[\\].|[^\\"])*"|;.*|[^\s('"`,;)]*)(.*)"""
 	def __init__(self, file):
@@ -113,7 +113,7 @@ def repl(inport=InPort(sys.stdin), out=sys.stdout):
 			val = eval(x)
 			if out and val is not None: print(to_string(val), file=out)
 		except Exception as e:
-			if out: print('{}: {}'.format(type(e).__name__, e), file=out)
+			if out: print(f'{e.__class__.__name__}: {e}', file=out)
 			else: raise
 
 def peval(x): return eval(parse(x))
@@ -126,12 +126,10 @@ class Env(dict):
 	def __init__(self, parms=(), args=(), outer=None):
 		# Bind parm list to corresponding args, or single parm to list of args
 		self.outer = outer
-		if isa(parms, Symbol):
-			self.update({parms:list(args)})
+		if isa(parms, Symbol): self.update({parms:list(args)})
 		else:
 			if len(args) != len(parms):
-				raise TypeError( 'expected {}, given {}, '\
-					.format(to_string(parms), to_string(args)) )
+				raise TypeError(f'expected {to_string(parms)}, given {to_string(args)}')
 			self.update(zip(parms,args))
 	def find(self, var):
 		'Find the innermost Env where var appears.'

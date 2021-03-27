@@ -1,9 +1,9 @@
 import os, sys, re, time, functools as ft
 
-from .core import Notification, NotificationMessage
+from . import core
 
 
-class PubSub(object):
+class PubSub:
 
 	# Messages with higher versions will be discarded
 	protocol_version = 1
@@ -74,8 +74,7 @@ class PubSub(object):
 	def _peer_addr_func(func):
 		@ft.wraps(func)
 		def _wrapper(self, addr, *args, **kws):
-			if not re.search(r'^\w+://', addr):
-				addr = 'tcp://{}'.format(addr)
+			if not re.search(r'^\w+://', addr): addr = f'tcp://{addr}'
 			return func(self, addr, *args, **kws)
 		return _wrapper
 
@@ -119,8 +118,8 @@ class PubSub(object):
 		elif data is None: return data
 		for t in int, str, bytes, bool, float:
 			if isinstance(data, t): return t(data)
-		raise ValueError(( 'Failed to sanitize data type:'
-			' {} (mro: {}, value: {})' ).format(type(data), type(data).mro(), data))
+		raise ValueError( 'Failed to sanitize data type:'
+			f' {type(data)} (mro: {type(data).mro()}, value: {data})' )
 
 	def encode(self, note):
 		data = self.strip_dbus_types(note.data)
@@ -130,11 +129,11 @@ class PubSub(object):
 		msg = msg.decode()
 		if ord(msg[0]) > self.protocol_version: return
 		hostname, ts, note_data = self.loads(msg[1:])
-		return NotificationMessage(hostname, ts, Notification(**note_data))
+		return core.NotificationMessage(hostname, ts, core.Notification(**note_data))
 
 	def send(self, note):
 		'Publish message to all connected peers.'
-		assert isinstance(note, Notification), note
+		assert isinstance(note, core.Notification), note
 		msg = self.encode(note)
 		# pub shouldn't block, but just to be safe
 		try: self.pub.send_string(msg, self.zmq.DONTWAIT)

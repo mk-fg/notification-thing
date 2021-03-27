@@ -1,12 +1,9 @@
-# -*- coding: utf-8 -*-
-from __future__ import print_function
-
 import os, sys, fcntl, time, base64, datetime as dt
 
 from . import core
 
 
-class FileLogger(object):
+class FileLogger:
 
 	_stream = _stream_file_id = None
 
@@ -37,7 +34,7 @@ class FileLogger(object):
 			if self._stream_file_id != stream_file_id: reopen = True
 		if ( self.rotate_files > 0
 				and stat and stat.st_size >= self.rotate_bytes ):
-			p_func = lambda n: '{}.{}'.format(self.dst_path, n)
+			p_func = lambda n: f'{self.dst_path}.{n}'
 			for n in range(self.rotate_files-1, 0, -1):
 				bak, bak_old = p_func(n), p_func(n+1)
 				try: os.rename(bak, bak_old)
@@ -53,10 +50,7 @@ class FileLogger(object):
 		uid = base64.urlsafe_b64encode(os.urandom(3))
 		ts_str = dt.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 		urgency = {core.urgency_levels.critical: '!', core.urgency_levels.low: '.'}.get(urgency, ' ')
-		msg = (
-			['{ts} :: {uid} {urgency} :: -- {title}'.format(
-				ts=ts_str, uid=uid, urgency=urgency, title=title )]
-			+ list( '{ts} :: {uid} {urgency} ::    {line}'.format(
-				ts=ts_str, uid=uid, urgency=urgency, line=line ) for line in body.splitlines() ) + [''] )
+		msg = [ f'{ts_str} :: {uid} {urgency} :: -- {title}',
+			*('{ts_str} :: {uid} {urgency} ::    {line}' for line in body.splitlines()), '' ]
 		stream.write('\n'.join(msg))
 		stream.flush()

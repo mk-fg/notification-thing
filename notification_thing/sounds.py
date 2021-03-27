@@ -7,7 +7,7 @@ class NSoundError(Exception): pass
 class NSoundInitError(NSoundError): pass
 class NSoundTimeout(NSoundError): pass
 
-class NotificationSounds(object):
+class NotificationSounds:
 	'Simple ctypes wrapper for libcanberra.'
 
 	ca_context_t = ctypes.c_void_p
@@ -53,7 +53,7 @@ class NotificationSounds(object):
 		if cls._lib_ca is None:
 			libca = cls._lib_ca = ctypes.CDLL('libcanberra.so.0')
 			for k in cls.ca_context_funcs:
-				getattr(libca, 'ca_context_{}'.format(k)).errcheck = cls._chk_int
+				getattr(libca, f'ca_context_{k}').errcheck = cls._chk_int
 		return cls._lib_ca
 
 
@@ -80,8 +80,7 @@ class NotificationSounds(object):
 	def _ctx_call(self, func, *args):
 		assert func in self.ca_context_funcs, func
 		assert self._ctx is not None
-		func = getattr(self._lib, 'ca_context_{}'.format(func))
-		func(self._ctx, *args)
+		getattr(self._lib, f'ca_context_{func}')(self._ctx, *args)
 
 	def _ctx_call_props(self, func, *args):
 		props_dict = (args and args[-1]) or None
@@ -137,11 +136,12 @@ class NotificationSounds(object):
 		return bool(res)
 
 	def wait(self, play_id, poll_delay=0.2, timeout=60):
-		deadline, countdown = time.time(), iter(xrange(int(timeout / poll_delay)))
+		deadline = time.monotonic() + timeout
+		countdown = iter(range(int(timeout / poll_delay)))
 		while True:
 			try: next(countdown)
 			except StopIteration:
-				if time.time() > deadline: raise NSoundTimeout()
+				if time.monotonic() > deadline: raise NSoundTimeout()
 			if not self.playing(play_id): return
 			time.sleep(poll_delay)
 
