@@ -455,7 +455,7 @@ class NotificationDaemon(dbus.service.Object):
 				if len(self._note_buffer) == 1\
 				else core.Notification.system_message(
 					'Feed' if not self._note_buffer.dropped
-						else 'Feed ({self._note_buffer.dropped} dropped)',
+						else f'Feed ({self._note_buffer.dropped} dropped)',
 					'\n\n'.join(it.starmap( '--- {}\n  {}'.format,
 						map(op.itemgetter('summary', 'body'), self._note_buffer) )),
 					app_name='notification-feed', icon=optz.feed_icon ) )
