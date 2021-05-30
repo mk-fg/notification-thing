@@ -180,18 +180,12 @@ class NotificationDaemon(dbus.service.Object):
 
 	@dbus.service.method(dbus_props, 's', 'a{sv}')
 	def GetAll(self, iface):
-		if iface != self.dbus_interface:
-			raise dbus.exceptions.DBusException(
-				f'This object does not implement the {iface!r} interface' )
 		self._activity_event()
 		return dict( urgent=optz.urgency_check,
 			plug=self.plugged, cleanup=self.timeout_cleanup )
 
 	@dbus.service.method(dbus_props, 'ssv', '')
 	def Set(self, iface, k, v):
-		if iface != self.dbus_interface:
-			raise dbus.exceptions.DBusException(
-				f'This object does not implement the {iface!r} interface' )
 		self._activity_event()
 
 		if isinstance(v, str):
