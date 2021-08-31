@@ -772,7 +772,7 @@ def main(argv=None):
 
 	try: daemon = NotificationDaemon(bus, pubsub, logger)
 	except core.StartupFailure as err:
-		log.error('Failed to initialize the daemon: {}', err)
+		log.error('Failed to initialize the daemon: %s', err)
 		return 1
 	loop = GLib.MainLoop()
 	log.debug('Starting gobject loop')
