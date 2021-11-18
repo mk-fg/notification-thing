@@ -47,10 +47,10 @@ class FileLogger:
 	def write(self, title, body, urgency=None, ts=None):
 		if not ts: ts = time.time()
 		stream = self.get_stream()
-		uid = base64.urlsafe_b64encode(os.urandom(3))
+		uid = base64.urlsafe_b64encode(os.urandom(3)).decode()
 		ts_str = dt.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 		urgency = {core.urgency_levels.critical: '!', core.urgency_levels.low: '.'}.get(urgency, ' ')
 		msg = [ f'{ts_str} :: {uid} {urgency} :: -- {title}',
-			*('{ts_str} :: {uid} {urgency} ::    {line}' for line in body.splitlines()), '' ]
+			*(f'{ts_str} :: {uid} {urgency} ::    {line}' for line in body.splitlines()), '' ]
 		stream.write('\n'.join(msg))
 		stream.flush()
