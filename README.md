@@ -80,11 +80,11 @@ Installation
 It's a regular package for Python 3.X, but not in pypi, so can be
 installed from a checkout with something like this:
 
-	% python setup.py install
+    % python setup.py install
 
 [pip](http://pip-installer.org/) can be used to install it from a repo URL:
 
-	% python -m pip install --user 'git+https://github.com/mk-fg/notification-thing.git#egg=notification-thing'
+    % python -m pip install --user 'git+https://github.com/mk-fg/notification-thing.git#egg=notification-thing'
 
 This will install module to `~/.local/lib/`, use
 [venv](https://docs.python.org/3/library/venv.html) module for a more
@@ -103,8 +103,12 @@ without any installation.
 
 * [libdbus / dbus-python](https://www.freedesktop.org/wiki/Software/DBusBindings/#libdbuspartofdbus).
 
-	Leftover dep from old python2 days, GDBus GI wrappers should probably provide
-	all necessary daemon interfaces as well these days.
+  Leftover dep from old python2 days, GDBus GI wrappers should probably provide
+  all necessary daemon interfaces as well these days.
+
+* [sgmllib3k](https://pypi.org/project/sgmllib3k/) - replacement for sgmllib
+  that was in Python-2.x stdlib, used for markup sanitizer, need to replace that
+  bit with something simple stdlib-based.
 
 * (optional) [PyYAML](http://pyyaml.org/) - to configure daemon via YAML file,
   not CLI (--conf option).
@@ -132,7 +136,7 @@ possible configuration options and tunables.
 Alternatively, dbus service file can be installed, so daemon can be started
 whenever notifications arrive (and exiting during silence timeouts):
 
-	cp org.freedesktop.Notifications.service /usr/share/dbus-1/services/
+    cp org.freedesktop.Notifications.service /usr/share/dbus-1/services/
 
 Another way would be to start the thing from systemd user session or something
 like that, e.g. ~/.xinitrc for older systems.
@@ -140,9 +144,9 @@ like that, e.g. ~/.xinitrc for older systems.
 To enable startup with systemd user session for particular user, run following
 from that user's shell:
 
-	mkdir -p ~/.config/systemd/user/
-	cp notification-thing.service ~/.config/systemd/user/
-	systemctl --user enable notification-thing
+    mkdir -p ~/.config/systemd/user/
+    cp notification-thing.service ~/.config/systemd/user/
+    systemctl --user enable notification-thing
 
 Can also start it manually then by `systemctl --user start notification-thing`
 command.
@@ -197,56 +201,56 @@ whether to display it or not.
 
 Example:
 
-	(define-macro define-matcher (lambda
-	  (name op comp last rev-args)
-	  `(define ,name (lambda args
-	    (if (= (length args) 1) ,last
-	      (let ((atom (car args)) (args (cdr args)))
-	        (,comp
-	          (,op ,@(if rev-args '((car args) atom) '(atom (car args))))
-	          (apply ,name (cons atom (cdr args))))))))))
+    (define-macro define-matcher (lambda
+      (name op comp last rev-args)
+      `(define ,name (lambda args
+        (if (= (length args) 1) ,last
+          (let ((atom (car args)) (args (cdr args)))
+            (,comp
+              (,op ,@(if rev-args '((car args) atom) '(atom (car args))))
+              (apply ,name (cons atom (cdr args))))))))))
 
-	(define-matcher ~all ~ and #t #f) ; (~all re msg-1 ...)
-	(define-matcher all~ ~ and #t #t) ; (all~ msg re-1 ...)
-	(define-matcher ~any ~ or #f #f)  ; (~any re msg-1 ...)
-	(define-matcher any~ ~ or #f #t)  ; (any~ msg re-1 ...)
+    (define-matcher ~all ~ and #t #f) ; (~all re msg-1 ...)
+    (define-matcher all~ ~ and #t #t) ; (all~ msg re-1 ...)
+    (define-matcher ~any ~ or #f #f)  ; (~any re msg-1 ...)
+    (define-matcher any~ ~ or #f #t)  ; (any~ msg re-1 ...)
 
-	(define-macro log-kern~ (lambda (level pat)
-	  `(~ ,(+ "^kern\." level " kernel\[-\]:\s+\[[\d.]+] " pat) body)))
+    (define-macro log-kern~ (lambda (level pat)
+      `(~ ,(+ "^kern\." level " kernel\[-\]:\s+\[[\d.]+] " pat) body)))
 
-	(lambda (summary body)
-	  (not (or
-	    ;; first section that returns #t suppresses notification
+    (lambda (summary body)
+      (not (or
+        ;; first section that returns #t suppresses notification
 
-	    ;; --- irc
-	    (and (~ "^erc:" summary) (or
-	      ;; hl-only high-traffic channels
-	      (and
-	        (any~ summary
-	          "^erc: #(python|linux|bookz)$"
-	          "^erc: (root|\*status)")
-	        (not (~ "mk-fg" body)))
-	      ;; irrelevant service messages
-	      (~ "Undefined CTCP query received. Silently ignored" body)
-	      (and
-	        (~ "^erc: #\S+" summary)
-	        (or
-	          (~ "^\*\*\* #\S+ (was created on|modes:) " body)
-	          (~ "^\s*\*\*\*\s+\S+\s+\(\S+\) is now known as \S+$" body)))
-	      ;; make a sound
-	      (sound-play (or
-	        (and (~ "mk-fg" body) "bell") ;; nick highlight
-	        (and (~ "^erc: [^#]" summary) "phone-incoming-call") ;; query
-	        "message-new-instant"))))
+        ;; --- irc
+        (and (~ "^erc:" summary) (or
+          ;; hl-only high-traffic channels
+          (and
+            (any~ summary
+              "^erc: #(python|linux|bookz)$"
+              "^erc: (root|\*status)")
+            (not (~ "mk-fg" body)))
+          ;; irrelevant service messages
+          (~ "Undefined CTCP query received. Silently ignored" body)
+          (and
+            (~ "^erc: #\S+" summary)
+            (or
+              (~ "^\*\*\* #\S+ (was created on|modes:) " body)
+              (~ "^\s*\*\*\*\s+\S+\s+\(\S+\) is now known as \S+$" body)))
+          ;; make a sound
+          (sound-play (or
+            (and (~ "mk-fg" body) "bell") ;; nick highlight
+            (and (~ "^erc: [^#]" summary) "phone-incoming-call") ;; query
+            "message-new-instant"))))
 
-	    ;; --- mail
-	    (and (~ "^New Mail:" summary) (sound-play "message"))
+        ;; --- mail
+        (and (~ "^New Mail:" summary) (sound-play "message"))
 
-	    ;; --- sounds for log monitoring events
-	    (sound-play
-	      (and (= summary "log:") (or
-	        (and (log-kern~ "info" "input: ") "device-added")
-	        (and (log-kern~ "info" "usb [-\d.]+: USB disconnect") "device-removed")))))))
+        ;; --- sounds for log monitoring events
+        (sound-play
+          (and (= summary "log:") (or
+            (and (log-kern~ "info" "input: ") "device-added")
+            (and (log-kern~ "info" "usb [-\d.]+: USB disconnect") "device-removed")))))))
 
 ~/.notification_filter is reloaded on-the-fly if updated, any errors will create
 additional notification windows (with backtraces), as well as logged.
@@ -290,9 +294,9 @@ dynamic and must be monitored for changes).
 D-Bus interface can be inspected via usual introspection methods (add "--xml" to
 get more canonical form):
 
-	gdbus introspect --session \
-	  --dest org.freedesktop.Notifications \
-	  --object-path /org/freedesktop/Notifications
+    gdbus introspect --session \
+      --dest org.freedesktop.Notifications \
+      --object-path /org/freedesktop/Notifications
 
 Extra non-spec methods:
 
@@ -326,12 +330,12 @@ Supported properties (full list can be acquired via usual "GetAll" method) are:
 
 For example, to temporarily block/unblock all but the urgent notifications:
 
-	dbus-send --type=method_call \
-	  --dest=org.freedesktop.Notifications \
-	  /org/freedesktop/Notifications \
-	  org.freedesktop.DBus.Properties.Set \
-	  org.freedesktop.Notifications \
-	  string:plug variant:string:toggle
+    dbus-send --type=method_call \
+      --dest=org.freedesktop.Notifications \
+      /org/freedesktop/Notifications \
+      org.freedesktop.DBus.Properties.Set \
+      org.freedesktop.Notifications \
+      string:plug variant:string:toggle
 
 
 ##### Appearance / styles
@@ -341,35 +345,33 @@ Appearance (and some behavior) of the popup windows is subject to
 (css files), with default being the light one (see the actual code for
 up-to-date stylesheet though):
 
-	#notification { background: transparent; }
-	#notification #frame { background-color: #d4ded8; padding: 3px; }
-	#notification #hs { background-color: black; }
+    #notification { background: transparent; }
+    #notification #frame { background-color: #d4ded8; padding: 3px; }
+    #notification #hs { background-color: black; }
 
-	#notification #critical { background-color: #ffaeae; }
-	#notification #normal { background-color: #f0ffec; }
-	#notification #low { background-color: #bee3c6; }
+    #notification #critical { background-color: #ffaeae; }
+    #notification #normal { background-color: #f0ffec; }
+    #notification #low { background-color: #bee3c6; }
 
-	#notification #summary {
-		padding-left: 5px;
-		font-size: 1.2em;
-		text-shadow: 1px 1px 0px gray;
-	}
-	#notification #body { font-size: 1em; }
-	#notification #body * { background-color: #d4ded8; }
+    #notification #summary {
+      padding-left: 5px;
+      font-size: 1.2em;
+      text-shadow: 1px 1px 0px gray;
+    }
+    #notification #body { font-size: 1em; }
+    #notification #body * { background-color: #d4ded8; }
 
 Full hierarchy of gtk3 widgets used (all have "Gtk" prefix in C code), how
 they're placed and named (used as `#<name>` in gtk3 css):
 
-```
-Window #notification
- Box #frame
-  HBox (only if icon is used)
-   Image (icon)  VBox
-                  EventBox #<urgency-level-name>
-                   Label #summary
-                  HSeparator #hs
-                  TextView #body
-```
+    Window #notification
+      Box #frame
+        HBox (only if icon is used)
+          Image (icon)  VBox
+                          EventBox #<urgency-level-name>
+                            Label #summary
+                          HSeparator #hs
+                          TextView #body
 
 (to see tree of these for running app, find all style nodes, tweak stuff on the fly
 and such, use [Gtk-Inspector](https://wiki.gnome.org/Projects/GTK%2B/Inspector))
@@ -378,13 +380,13 @@ For example, if you have compositing wm that supports transparency, to make
 notification popups have slightly rounded corners, one can put this to
 `~/.config/gtk-3.0/gtk.css`:
 
-	#notification #frame { border-radius: 7px; }
+    #notification #frame { border-radius: 7px; }
 
 Or, to use ~20% larger font size (wrt default size) in both notification summary
 and body text:
 
-	#notification #summary { font-size: 1.4em; }
-	#notification #body { font-size: 1.2em; }
+    #notification #summary { font-size: 1.4em; }
+    #notification #body { font-size: 1.2em; }
 
 
 ##### Text markup
