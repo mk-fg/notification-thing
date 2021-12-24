@@ -623,7 +623,7 @@ def main(argv=None):
 		help='Enable pango markup (tags, somewhat similar to html)'
 				' processing in all message summary/body parts by default.'
 			' These will either be rendered by pango'
-				' or stripped/shown-as-is (see --pango-markup-strip-on-err option), if invalid.'
+				' or stripped/shown-as-is (see --markup-strip-on-err option), if invalid.'
 			' "x-nt-markup" bool hint can be used to'
 				' enable/disable markup on per-message basis, regardless of this option value.'
 			' See "Markup" section of the README for more details.')

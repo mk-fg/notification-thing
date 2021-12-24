@@ -1,6 +1,7 @@
 import itertools as it, operator as op, functools as ft
 from xml.sax.saxutils import escape as xml_escape
-import os, re, sgmllib, collections as cs, urllib.request as ulr
+import html.parser, html.entities
+import os, re, collections as cs, urllib.request as ulr
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -13,12 +14,11 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class MarkupToText(sgmllib.SGMLParser):
-	# Taken from some eff-bot code on c.l.p.
-	sub, entitydefs = '', dict()
-	def unknown_starttag(self, tag, attr): self.d.append(self.sub)
-	def unknown_endtag(self, tag): self.d.append(self.sub)
-	def unknown_entityref(self, ref): self.d.extend(['&', ref, ';'])
+class MarkupToText(html.parser.HTMLParser):
+	def handle_starttag(self, tag, attrs): pass
+	def handle_endtag(self, tag): pass
+	def handle_entityref(self, ref): self.d.append(f'&{ref};')
+	def handle_charref(self, ref): self.d.append(f'&#{ref};')
 	def handle_data(self, data): self.d.append(data)
 
 	def __call__(self, s):

@@ -106,10 +106,6 @@ without any installation.
   Leftover dep from old python2 days, GDBus GI wrappers should probably provide
   all necessary daemon interfaces as well these days.
 
-* [sgmllib3k](https://pypi.org/project/sgmllib3k/) - replacement for sgmllib
-  that was in Python-2.x stdlib, used for markup sanitizer, need to replace that
-  bit with something simple stdlib-based.
-
 * (optional) [PyYAML](http://pyyaml.org/) - to configure daemon via YAML file,
   not CLI (--conf option).
 
@@ -391,7 +387,7 @@ and body text:
 
 ##### Text markup
 
-[Pango markup](https://developer.gnome.org/pango/stable/pango-Markup.html)
+[Pango markup](https://docs.gtk.org/Pango/pango_markup.html)
 both in message body and summary is supported and processing of it is enabled by
 default (can be disabled with --markup-disable).
 
