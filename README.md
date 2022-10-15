@@ -119,6 +119,12 @@ Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here 
 it is usually used to send the messages, not receive and display these (that's
 the job of notification-daemon, which generally come with DEs).
 
+### Repository URLs
+
+- https://github.com/mk-fg/notification-thing
+- https://codeberg.org/mk-fg/notification-thing
+- https://fraggod.net/code/git/notification-thing
+
 
 Usage
 --------------------
