@@ -421,19 +421,20 @@ notification on startup, which can be used to test this stuff.
 Needs pyzmq module, if used.
 
 Allows to serialize notifications received from dbus interface and publish them
-on zmq_pub socket.
+on zmq\_pub socket(s), or receive them in a similar way from the network on
+zmq\_sub socket(s).
 
-Any instances connected to that will receive notification, and any transient
-network issues should be handled by zeromq - pub socket should keep messages
-queued for subscribers it has seen (connected) at least once.
+Any connected instances will receive notifications, and any transient network
+issues should be handled by zeromq - pub socket should keep messages queued
+for subscribers it has seen (connected) at least once.
 
 Furthermore, it's not required that subscribers should connect to publishers or
 vice versa - any zeromq sockets can initiate connection to any other ones, so
-that e.g. "notify-net" tool (included) can create "pub" sucket and connect to a
+that e.g. "notify-net" tool (included) can create "pub" socket and connect to a
 running daemon's "sub" socket on another machine - or any number of machines,
-just specify -d option many times - then publish messages there.
+just specify -d option as many times as needed - then publish messages there.
 
 See --net-* options for all that.
 
-Only limitation here is sanity - not much point linking e.g. subscriber sockets
-to each other.
+Make sure to link pub sockets with sub (in whatever direction), as linking
+pub-pub or sub-sub won't do anything.
