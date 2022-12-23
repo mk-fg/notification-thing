@@ -443,6 +443,11 @@ See --net-* options for all that.
 Make sure to link pub sockets with sub (in whatever direction), as linking
 pub-pub or sub-sub won't do anything.
 
+When/if running this notification mechanism over public internet
+(and maybe even if not), I'd recommend using one of the
+[WireGuard mesh network tools](https://github.com/HarvsG/WireGuardMeshes)
+to have it done in a reliably secure manner.
+
 Format for ZeroMQ messages used by this app:
 
     message: byte(protocol_version) || json(notification_message)
