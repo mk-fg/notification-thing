@@ -2,13 +2,17 @@ notification-thing
 --------------------
 
 Gtk3/Python (PyGI) notification daemon with flexible (scriptable) filtering,
-rate-limiting and misc other cool features, not tied to any particular DE.
+rate-limiting and misc other features, for linux desktop, not tied to any
+particular desktop environment.
 
 ![showcase image](showcase.jpg)
 
+(nevermind bad font rendering, need to update that old image)
+
 Features:
 
-* Implements [Desktop Notification spec](http://developer.gnome.org/notification-spec/).
+* Implements [Desktop Notification spec](https://specifications.freedesktop.org/notification-spec/latest/)
+  (current version 1.2).
 
   Should be compatible with any dbus clients (e.g. libnotify, Gtk3, etc).
   Supports icons and resizing of these (to a fixed/min/max box).
@@ -16,38 +20,38 @@ Features:
 * Tries hard to never drop any notifications silently by itself, even in case of
   any unexpected errors.
 
-* [Pango markup](https://developer.gnome.org/pango/stable/pango-Markup.html)
+* [Pango markup](https://docs.gtk.org/Pango/pango_markup.html)
   support in notification summary and body, option to enable/disable that for
   individual messages via notification parameters, broken-markup-safe.
   Start the thing with --test-message option to see how it works.
 
 * Configurable appearance via
-  [Gtk3 styles](https://developer.gnome.org/gtk3/stable/theming.html)
+  [Gtk3 styles](https://docs.gtk.org/gtk3/css-overview.html)
   (simple css files) and themes.
 
-* Rate-limiting using "leaky" token-bucket algorithm, with all the knobs
-  configurable.
+* Rate-limiting using configurable "leaky" token-bucket algorithm.
 
   When/if several messages get delayed, they will be displayed batched into one
   "digest" message, up to a limit (number of last ones), and dropped with a
   warning line (and a count of these) beyond that.
 
-* D-Bus interface allows calls to pause passing notifications, but still
-  buffering these to "digest", force-flushing such buffer, displaying previous
+* D-Bus interface has extra calls to pause passing notifications (but still
+  buffering these to "digest"), force-flushing such buffer, displaying previous
   (cleaned-up) notifications, changing/pausing default cleanup timeout, etc.
 
 * Can send/receive json-serialized notifications via
-  [ZeroMQ](http://zeromq.org/) pub-sub queues.
+  [ZeroMQ](https://zeromq.org/) pub-sub queues.
 
-  This allows to e.g. tie up several machines to see all notifications which are
-  from any of them or send desktop notifications from a remote machine
-  (doesn't have to be a desktop one either, see included "notify-net" script).
+  This allows to e.g. link several machines together, to see all notifications
+  which are from any of them or send desktop notifications from a remote machine
+  (doesn't have to be a desktop one either, see included "notify-net" script and
+  zmq message format info below).
 
-* Filtering using simple but very powerful scheme scripting
-  (based on [Peter Norvig's lispy2](http://norvig.com/lispy2.html)).
+* Filtering and matching using simple but very powerful scheme scripting
+  (based on [Peter Norvig's lispy2](https://norvig.com/lispy2.html)).
 
 * Can play any sounds from anywhere in the filtering scripts
-  (via [libcanberra](http://0pointer.de/lennart/projects/libcanberra/)).
+  (via [libcanberra](https://0pointer.net/lennart/projects/libcanberra/)).
 
   I.e. only on specific occasions, like some regexp-match, not for every message
   (though that is certainly possible as well), different sounds based on
@@ -55,23 +59,24 @@ Features:
 
 * Optional logging for notifications with built-in file rotation.
 
-* All options/features are configurable and can be disabled entirely, either
-  from command-line or a YAML configuration file.
+* All options/features are configurable and can be disabled entirely,
+  either via command-line options or a YAML configuration file.
 
 * Easy to change and debug - it's just a python script.
 
-See below for a detailed description of each particular feature.
+See below for detailed description of each particular feature.
 
 Actual notification rendering is inspired (and based in part on)
 [notipy](https://gitlab.com/the_isz/notipy) project.
 
 Wrote a few notes on the project a while ago when making it
-([link1](http://blog.fraggod.net/2010/2/libnotify-notification-daemon-shortcomings-and-my-solution),
-[link2](http://blog.fraggod.net/2010/12/Further-improvements-on-notification-daemon),
-[link3](http://blog.fraggod.net/2011/8/Notification-daemon-in-python)), but
+([link1](https://blog.fraggod.net/2010/2/libnotify-notification-daemon-shortcomings-and-my-solution),
+[link2](https://blog.fraggod.net/2010/12/Further-improvements-on-notification-daemon),
+[link3](https://blog.fraggod.net/2011/8/Notification-daemon-in-python)), but
 these should be mostly summarized in this README anyway.
 
-It's a somewhat old thing dating back to 2010 and python2, but I still use it myself.
+It's a somewhat old thing dating back to 2010 and python2, but I still use it myself,
+so should be supported and work perfectly fine on a reasonably-current linux desktop.
 
 
 Installation
@@ -82,42 +87,42 @@ installed from a checkout with something like this:
 
     % python setup.py install
 
-[pip](http://pip-installer.org/) can be used to install it from a repo URL:
+[pip](https://pip.pypa.io/) can be used to install it from a repo URL:
 
     % python -m pip install --user 'git+https://github.com/mk-fg/notification-thing.git#egg=notification-thing'
 
 This will install module to `~/.local/lib/`, use
-[venv](https://docs.python.org/3/library/venv.html) module for a more
-isolated/portable installation into some custom path.
+[venv](https://docs.python.org/3/library/venv.html)
+module for a more isolated/portable installation into some custom path.
 
 Alternatively, `./notification-thing` can be run right from the checkout tree,
 without any installation.
 
 ### Requirements
 
-* [Python 3.X](http://python.org/).
+* [Python 3.X](https://python.org/).
 
-* [GObject-Introspection](https://live.gnome.org/GObjectIntrospection/)-enabled
-  [Gtk+](http://www.gtk.org/) 3.X (including Glib, Pango) and
-  [PyGObject](http://live.gnome.org/PyGObject).
+* [GObject-Introspection](https://gi.readthedocs.io/en/latest/)-enabled
+  [Gtk+](https://www.gtk.org/) 3.X (including Glib, Pango) and
+  [PyGObject](https://pygobject.readthedocs.io/en/latest/).
 
 * [libdbus / dbus-python](https://www.freedesktop.org/wiki/Software/DBusBindings/#libdbuspartofdbus).
 
   Leftover dep from old python2 days, GDBus GI wrappers should probably provide
   all necessary daemon interfaces as well these days.
 
-* (optional) [PyYAML](http://pyyaml.org/) - to configure daemon via YAML file,
+* (optional) [PyYAML](https://pyyaml.org/) - to configure daemon via YAML file,
   not CLI (--conf option).
 
-* (optional) [pyzmq](http://zeromq.github.io/pyzmq/) - to broadcast/receive
-  notification messages over zeromq pub/sub sockets.
+* (optional) [pyzmq](https://pyzmq.readthedocs.io/en/latest/) -
+  to broadcast/receive notification messages over zeromq pub/sub sockets.
 
-* (optional) [libcanberra](http://0pointer.de/lennart/projects/libcanberra/) -
+* (optional) [libcanberra](https://0pointer.net/lennart/projects/libcanberra/) -
   to play sounds (from XDG themes or files).
 
-Note that [libnotify](http://developer.gnome.org/libnotify/) is not needed here -
-it is usually used to send the messages, not receive and display these (that's
-the job of notification-daemon, which generally come with DEs).
+Note that [libnotify](https://gitlab.gnome.org/GNOME/libnotify) and similar libs
+are not needed here - they are used to send the messages, not receive and
+display these (latter is the job of notification-daemon, which this thing is).
 
 ### Repository URLs
 
@@ -184,7 +189,7 @@ used to control filtering mechanism at runtime and play sounds where necessary
 
 It's the simple scheme script, see
 [scheme submodule](https://github.com/mk-fg/notification-thing/blob/master/notification_thing/scheme.py)
-or [original Peter Norvig's "lispy2" implementation](http://norvig.com/lispy2.html)
+or [original Peter Norvig's "lispy2" implementation](https://norvig.com/lispy2.html)
 for details.
 
 Global definitions:
@@ -286,9 +291,9 @@ notification and possibly play multiple samples (in sequence or at the same time
 don't init/touch libcanberra at all and make sound-* into a no-op functions.
 
 "gtk-sound-theme-name" setting is used to select
-[sound theme](http://0pointer.de/public/sound-theme-spec.html) in libcanberra,
-"gtk-enable-event-sounds" is NOT used though (not implemented, as it's more
-dynamic and must be monitored for changes).
+[sound theme](https://freedesktop.org/wiki/Specifications/sound-theme-spec/)
+in libcanberra, "gtk-enable-event-sounds" is NOT used though (not implemented,
+as it's more dynamic and must be monitored for changes).
 
 
 ##### Extra dbus commands
@@ -305,11 +310,11 @@ Extra non-spec methods:
  - "Flush" - no args, no returns - display all queued (due to rate-limiting)
    notifications.
 
- - "Cleanup" - args: timeout (double), max_count (uint32), no returns - close
+ - "Cleanup" - args: timeout (double), max\_count (uint32), no returns - close
    currently-displayed notifications older than passed timeout (seconds).
-   Notification bubbles are closed in oldest-first order up to "max_count" value
+   Notification bubbles are closed in oldest-first order up to "max\_count" value
    (0 - all), so to close one oldest note, one might pass timeout=0,
-   max_count=1.
+   max\_count=1.
 
  - "List" - no args, returns array of int32 - return list of currently-displayed
    notification ids.
@@ -343,9 +348,9 @@ For example, to temporarily block/unblock all but the urgent notifications:
 ##### Appearance / styles
 
 Appearance (and some behavior) of the popup windows is subject to
-[gtk3 styles](https://developer.gnome.org/gtk3/stable/theming.html)
-(css files), with default being the light one (see the actual code for
-up-to-date stylesheet though):
+[gtk3 styles](https://docs.gtk.org/gtk3/css-overview.html)
+(css files), with default being the light one
+(see actual code for up-to-date stylesheet though):
 
     #notification { background: transparent; }
     #notification #frame { background-color: #d4ded8; padding: 3px; }
@@ -406,11 +411,10 @@ option) and/or warning should be issued.
 
 Technically GtkTextView widget used for message body doesn't allow pango markup
 (though GtkLabel holding summary does, see also
-[gnome bug 59390](https://bugzilla.gnome.org/show_bug.cgi?id=59390)) and uses it's own
-[GtkTextTag](https://developer.gnome.org/gtk3/unstable/GtkTextTag.html)-based markup,
-which is very similar to pango, so pango stuff gets ad-hoc converted to
-GtkTextTags (see `display.pango_markup_to_gtk`), and potentially (but unlikely)
-can get something wrong.
+[gnome bug 59390](https://bugzilla.gnome.org/show_bug.cgi?id=59390)) and uses
+it's own GtkTextTag-based markup, which is very similar to pango, so pango stuff
+gets ad-hoc converted to GtkTextTags (see `display.pango_markup_to_gtk`),
+and potentially (but unlikely) can get something wrong.
 
 Starting daemon with --test-message option will have display pango-markup-heavy
 notification on startup, which can be used to test this stuff.
@@ -418,7 +422,7 @@ notification on startup, which can be used to test this stuff.
 
 ##### Network broadcasting
 
-Needs pyzmq module, if used.
+Needs [pyzmq](https://pyzmq.readthedocs.io/en/latest/) module, if used.
 
 Allows to serialize notifications received from dbus interface and publish them
 on zmq\_pub socket(s), or receive them in a similar way from the network on
@@ -431,10 +435,43 @@ for subscribers it has seen (connected) at least once.
 Furthermore, it's not required that subscribers should connect to publishers or
 vice versa - any zeromq sockets can initiate connection to any other ones, so
 that e.g. "notify-net" tool (included) can create "pub" socket and connect to a
-running daemon's "sub" socket on another machine - or any number of machines,
-just specify -d option as many times as needed - then publish messages there.
+running daemon's "sub" socket on another machine - or any number of machines -
+just specify -d option as many times as needed, then publish messages there.
 
 See --net-* options for all that.
 
 Make sure to link pub sockets with sub (in whatever direction), as linking
 pub-pub or sub-sub won't do anything.
+
+Format for ZeroMQ messages used by this app:
+
+    message: byte(protocol_version) || json(notification_message)
+    notification_message: [hostname, posix_time, notification]
+    notification: { summary: "", body: "", timeout: -1,
+      icon: "", app_name: "generic", replaces_id: 0, actions: [], hints: {}, plain: False }
+
+Which is basically a version-prefix byte followed by json-encoded payload:
+
+- "protocol_version" is 1 (resuting in \x01 byte prefix).
+
+- "hostname" (String) will be displayed as prefix in message summary.
+
+- "posix_time" (Number) is a wall-clock timestamp, which can be indicated in
+  notification if message is reasonably old (e.g. older than 15min), to
+  highlight that it might be outdated or out of sequence with other notifications.
+
+- All fields in "notification" (Object) - except "plain" - are same as described in
+  [Desktop Notifications Specification](https://specifications.freedesktop.org/notification-spec/latest/)
+  "Basic Design" section, with default values presented in mapping above.
+
+- Extra "plain" field in "notification" object is a boolean that toggles disabling
+  [pango markup tags](https://docs.gtk.org/Pango/pango_markup.html) processing.
+
+  I.e. plain=true will make text in summary/body fields printed exactly as it is,
+  which might be useful if it can contain valid HTML/XML tags that'd parse as pango stuff.
+
+Simple notification-message example, represented in python string format:
+
+    '\x01["myhost", 1671650325.25, {"summary": "hello", "body": "hello world!"}]'
+
+(note that leading \x01 gets translated in these strings to a single 01 byte)
