@@ -199,8 +199,9 @@ Global definitions:
 
 - `(~ re msg)` - regexp search.
 - `(debug val-1 ...)` - print all arguments to --debug log.
-- `(sound-play name)`, `(sound-play-sync name)`, etc - play sounds via
-  libcanberra, if available - see note on sounds below.
+- `(sound-play name)`, `(sound-play-sync name)`, etc -
+  play sounds via libcanberra, if available - see note on sounds below.
+- `(props key value ...)` - set notification properties, like timeout, icon, hints.
 
 Evaluation of the filter script should return the function which will be called
 for each notification and should return either #t or #f verdict value for
@@ -252,6 +253,10 @@ Example:
 
         ;; --- mail
         (and (~ "^New Mail:" summary) (sound-play "message"))
+
+        ;; --- important notifications can have special properties set on them
+        (and (~ "------------[ cut here ]------------" body)
+          (or (props "hints.urgency" 2 "timeout" 0 "icon" "kernel-panic")))
 
         ;; --- sounds for log monitoring events
         (sound-play

@@ -323,7 +323,7 @@ class NotificationDaemon(dbus.service.Object):
 	_filter_ts_chk = 0
 	_filter_callback = None, 0
 
-	def _notification_check(self, summary, body):
+	def _notification_check(self, summary, body, note=None):
 		(cb, mtime), ts = self._filter_callback, time.monotonic()
 		if self._filter_ts_chk < ts - poll_interval:
 			self._filter_ts_chk = ts
@@ -344,10 +344,10 @@ class NotificationDaemon(dbus.service.Object):
 					self._filter_callback = cb, mtime
 		if cb is None: return True # no filtering defined
 		elif not callable(cb): return bool(cb)
-		try: return cb(summary, body)
+		try: return cb(summary, body, note)
 		except:
 			ex = traceback.format_exc()
-			log.debug('Failed to execute notification filters:\n%s', ex)
+			log.debug('Failed to run notification filters:\n%s', ex)
 			if optz.status_notify:
 				self.display('notification-thing: notification filters failed', ex)
 			return True
@@ -376,7 +376,7 @@ class NotificationDaemon(dbus.service.Object):
 	def filter_display(self, note):
 		'Main method which all notifications are passed to for processing/display.'
 		note_summary, note_body = self._note_plaintext(note)
-		filter_pass = self._notification_check(note_summary, note_body)
+		filter_pass = self._notification_check(note_summary, note_body, note)
 		try: urgency = int(note.hints['urgency'])
 		except (KeyError, ValueError): urgency = None
 

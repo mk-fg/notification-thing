@@ -81,10 +81,10 @@ class Notification(cs.UserDict):
 
 	data = created = None
 
-	init_args = 'summary', 'body', 'timeout', 'icon',\
-		'app_name', 'replaces_id', 'actions', 'hints', 'plain'
-	dbus_args = 'app_name', 'replaces_id', 'icon',\
-		'summary', 'body', 'actions', 'hints', 'timeout'
+	init_args = ( 'summary', 'body', 'timeout',
+		'icon', 'app_name', 'replaces_id', 'actions', 'hints', 'plain' )
+	dbus_args = ( 'app_name', 'replaces_id',
+		'icon', 'summary', 'body', 'actions', 'hints', 'timeout' )
 	default_timeout = optz['popup_timeout']
 
 	@classmethod
@@ -130,21 +130,33 @@ class Notification(cs.UserDict):
 NotificationMessage = cs.namedtuple('NotificationMessage', 'hostname ts note')
 
 
-_scheme_init = False
+_scheme_state = None
 
 def get_filter(path, sound_env=None):
-	if not _scheme_init:
+	global _scheme_state
+	if _scheme_state is None:
 		sound_env = sound_env or dict()
 		noop_func = lambda *a: None
 		init_env({
 			'~': lambda regex, string: bool(re.search(regex, string)),
 			'sound-play': sound_env.get('play', noop_func),
 			'sound-cache': sound_env.get('cache', noop_func),
-			'sound-play-sync': sound_env.get('play_sync', noop_func) })
-	return load(path)
+			'sound-play-sync': sound_env.get('play_sync', noop_func),
+			'props': lambda *props: _scheme_state.update(props=props) })
+		_scheme_state = dict()
+	scheme_func = load(path)
+	def filter_func(summary, body, note=None):
+		_scheme_state.clear()
+		result = scheme_func(summary, body)
+		if note and (props := _scheme_state.get('props')):
+			for k, v in zip(*([iter(props)]*2)):
+				if not k.startswith('hints.'): note[k] = v
+				else: note.setdefault('hints', dict())[k[6:]] = v
+		return result
+	return filter_func
 
 def get_sound_env(force_sync=False, trap_errors=False):
-	assert not _scheme_init # must be initialized before scheme env
+	assert _scheme_state is None # must be initialized before scheme env
 	# Can pass window position and allow configuration of canberra props here
 	from .sounds import NotificationSounds, NSoundError, NSoundInitError
 	log = logging.getLogger('core.sound')
