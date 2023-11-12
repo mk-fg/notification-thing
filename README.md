@@ -5,9 +5,7 @@ Gtk3/Python (PyGI) notification daemon with flexible (scriptable) filtering,
 rate-limiting and misc other features, for linux desktop, not tied to any
 particular desktop environment.
 
-![showcase image](showcase.jpg)
-
-(nevermind bad font rendering, need to update that old image)
+![showcase image](showcase.png)
 
 Features:
 
@@ -255,7 +253,7 @@ Example:
         (and (~ "^New Mail:" summary) (sound-play "message"))
 
         ;; --- important notifications can have special properties set on them
-        (and (~ "------------[ cut here ]------------" body)
+        (and (~ "------------\[ cut here \]------------" body)
           (or (props "hints.urgency" 2 "timeout" 0 "icon" "kernel-panic")))
 
         ;; --- sounds for log monitoring events

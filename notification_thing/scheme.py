@@ -157,16 +157,16 @@ def add_globals(self):
 	self.update(vars(math))
 	self.update(vars(cmath))
 	self.update({
-		'+':lambda *a:ft.reduce(op.add, a[1:], a[0]),
-		'-':op.sub, '*':op.mul, '/':op.truediv, 'not':op.not_,
-		'>':op.gt, '<':op.lt, '>=':op.ge, '<=':op.le, '=':op.eq,
-		'equal?':op.eq, 'eq?':op.is_, 'length':len, 'cons':cons,
-		'car':lambda x:x[0], 'cdr':lambda x:x[1:], 'append':op.add,
-		'list':lambda *x:list(x), 'list?': lambda x:isa(x,list),
-		'null?':lambda x:x==[], 'symbol?':lambda x: isa(x, Symbol),
-		'boolean?':lambda x: isa(x, bool), 'pair?':is_pair,
-		'apply':lambda proc,l: proc(*l), 'eval':lambda x: eval(expand(x)),
-		'prog':lambda *a:None, 'call/cc':callcc,
+		'+': lambda *a: ft.reduce(op.add, a[1:], a[0]),
+		'-': op.sub, '*': op.mul, '/': op.truediv, 'not': op.not_,
+		'>': op.gt, '<': op.lt, '>=': op.ge, '<=': op.le, '=': op.eq,
+		'equal?': op.eq, 'eq?': op.is_, 'length': len, 'cons': cons,
+		'car': lambda x: x[0], 'cdr': lambda x: x[1: ], 'append': op.add,
+		'list': lambda *x: list(x), 'list?': lambda x: isa(x, list),
+		'null?': lambda x: x == [], 'symbol?': lambda x: isa(x, Symbol),
+		'boolean?': lambda x: isa(x, bool), 'pair?': is_pair,
+		'apply': lambda proc, l: proc(*l), 'eval': lambda x: eval(expand(x)),
+		'prog': lambda *a: None, 'call/cc': callcc,
 		'debug': (lambda *args: log.debug('debug args: %s', args)) })
 	return self
 
