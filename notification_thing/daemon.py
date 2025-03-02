@@ -46,7 +46,7 @@ def flatten_dict(data, path=tuple()):
 	return dst
 
 def ts_diff_format( seconds, add_ago=False,
-		_units_days=dict(y=365.25, mo=30.5, w=7, d=0),
+		_units_days=dict(y=365.2422, mo=30.5, w=7, d=0),
 		_units_s=dict(h=3600, m=60, s=0) ):
 	days = seconds // (24*3600)
 	seconds -= days * (24*3600)
@@ -111,7 +111,7 @@ class NotificationDaemon(dbus.service.Object):
 
 		if optz.test_message:
 			# Also test crazy web-of-90s markup here :P
-			summary = 'Notification daemon started <small><tt>¯\(°_o)/¯</tt></small>'
+			summary = r'Notification daemon started <small><tt>¯\(°_o)/¯</tt></small>'
 			body = (
 					'Desktop notification daemon started successfully on host: <u>{host}</u>'
 					'\nVersion: <span stretch="extraexpanded">{v}</span>'
