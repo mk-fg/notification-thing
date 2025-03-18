@@ -148,7 +148,7 @@ def get_filter(path, sound_env=None):
 	def filter_func(summary, body, note=None):
 		_scheme_state.clear()
 		result = scheme_func(summary, body)
-		if note and (props := _scheme_state.get('props')):
+		if note is not None and (props := _scheme_state.get('props')):
 			for k, v in zip(*([iter(props)]*2)):
 				if not k.startswith('hints.'): note[k] = v
 				else: note.setdefault('hints', dict())[k[6:]] = v

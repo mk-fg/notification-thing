@@ -721,11 +721,12 @@ def main(argv=None):
 			force_sync=optz.filter_test, trap_errors=not (optz.filter_test or optz.debug) )
 
 	if optz.filter_test:
-		func = core.get_filter(optz.filter_file, optz.filter_sound)
-		filtering_result = func(*optz.filter_test)
+		note, func = dict(), core.get_filter(optz.filter_file, optz.filter_sound)
+		filtering_result = func(*optz.filter_test, note=note)
 		msg_repr = 'Message - summary: {!r}, body: {!r}'.format(*optz.filter_test)
 		print('{}\nFiltering result: {} ({})'.format( msg_repr,
 			filtering_result, 'will pass' if filtering_result else "won't pass" ))
+		if note: print(f'Added properties: {note}')
 		return
 
 	optz.icon_scale = dict()
