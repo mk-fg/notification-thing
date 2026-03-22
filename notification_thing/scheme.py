@@ -157,9 +157,9 @@ def add_globals(self):
 	self.update(vars(math))
 	self.update(vars(cmath))
 	self.update({
-		'+': lambda *a: ft.reduce(op.add, a[1:], a[0]),
-		'-': op.sub, '*': op.mul, '/': op.truediv, 'not': op.not_,
-		'>': op.gt, '<': op.lt, '>=': op.ge, '<=': op.le, '=': op.eq,
+		'+': lambda *a: ft.reduce(op.add, a[1:], a[0]), '-': op.sub,
+		'*': op.mul, '/': op.truediv, 'not': op.not_, '>': op.gt, '<': op.lt,
+		'>=': op.ge, '<=': op.le, '=': op.eq, 'in?': lambda a,b: a in b,
 		'equal?': op.eq, 'eq?': op.is_, 'length': len, 'cons': cons,
 		'car': lambda x: x[0], 'cdr': lambda x: x[1: ], 'append': op.add,
 		'list': lambda *x: list(x), 'list?': lambda x: isa(x, list),
